@@ -1,0 +1,146 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "SCREEN_A": [
+      "SCREEN_B",
+      "SCREEN_C"
+    ],
+    "SCREEN_B": [
+      "SCREEN_C"
+    ],
+    "SCREEN_C": []
+  },
+  "screens": [
+    {
+      "id": "SCREEN_A",
+      "title": "Screen A",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_a",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Screen A"
+              },
+              {
+                "type": "Button",
+                "label": "Ir directo a C",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "SCREEN_C"
+                  },
+                  "payload": {
+                    "name": ""
+                  }
+                }
+              },
+              {
+                "type": "TextInput",
+                "name": "name",
+                "label": "Nombre",
+                "required": false
+              },
+              {
+                "type": "Footer",
+                "label": "Ir a B",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "SCREEN_B"
+                  },
+                  "payload": {
+                    "name": "${form.name}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SCREEN_B",
+      "title": "Screen B",
+      "data": {
+        "name": {
+          "type": "string",
+          "__example__": "test"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_b",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Screen B"
+              },
+              {
+                "type": "Footer",
+                "label": "Ir a C",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "SCREEN_C"
+                  },
+                  "payload": {
+                    "name": "${data.name}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SCREEN_C",
+      "title": "Screen C",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "name": {
+          "type": "string",
+          "__example__": "test"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_c",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Screen C"
+              },
+              {
+                "type": "Footer",
+                "label": "Finalizar",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "name": "${data.name}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

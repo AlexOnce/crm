@@ -1,0 +1,976 @@
+{
+  "version": "7.3",
+  "screens": [
+    {
+      "id": "PASSENGER_INFO",
+      "title": "TAMep - Pasajero Titular (1 de 5)",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "passenger_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "                  EPTAM"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Registro de Pasajero"
+              },
+              {
+                "type": "TextBody",
+                "text": "Ingrese los datos requeridos para la emisión oficial de su pasaje:"
+              },
+              {
+                "type": "TextInput",
+                "name": "full_name",
+                "label": "Nombres",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "full_ape",
+                "label": "Apellidos",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "doc_number",
+                "label": "CI / DNI",
+                "required": true,
+                "helper-text": "Ej: 8492015 o 8492015 LP"
+              },
+              {
+                "type": "TextInput",
+                "name": "passport_number",
+                "label": "Pasaporte",
+                "required": false,
+                "helper-text": "Opcional (si viaja con pasaporte)"
+              },
+              {
+                "type": "DatePicker",
+                "name": "birth_date",
+                "label": "Fecha de Nacimiento",
+                "required": true,
+                "helper-text": "Día, mes y año de nacimiento"
+              },
+              {
+                "type": "Dropdown",
+                "name": "gender",
+                "label": "Género",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "Femenino",
+                    "title": "Femenino"
+                  },
+                  {
+                    "id": "Masculino",
+                    "title": "Masculino"
+                  }
+                ]
+              },
+              {
+                "type": "TextInput",
+                "name": "email",
+                "label": "E-mail",
+                "required": true,
+                "input-type": "email",
+                "helper-text": "Para envío del boleto digital"
+              },
+              {
+                "type": "TextInput",
+                "name": "doc_telefonico",
+                "label": "Teléfono",
+                "required": true,
+                "input-type": "phone",
+                "helper-text": "Número de celular o WhatsApp"
+              },
+              {
+                "type": "TextInput",
+                "name": "observation",
+                "label": "Observación",
+                "required": false,
+                "helper-text": "Asistencia, silla de ruedas, equipaje especial (opcional)"
+              },
+              {
+                "type": "TextHeading",
+                "text": "Datos Factura"
+              },
+              {
+                "type": "TextInput",
+                "name": "invoice_razon_social",
+                "label": "Razón Social",
+                "required": false,
+                "helper-text": "Nombre o empresa para la factura"
+              },
+              {
+                "type": "Dropdown",
+                "name": "invoice_doc_type",
+                "label": "Tipo de documento",
+                "required": false,
+                "data-source": [
+                  {
+                    "id": "NIT",
+                    "title": "NIT"
+                  },
+                  {
+                    "id": "CI",
+                    "title": "Cédula de Identidad (CI)"
+                  },
+                  {
+                    "id": "PAS",
+                    "title": "Pasaporte"
+                  },
+                  {
+                    "id": "CEX",
+                    "title": "Carnet de Extranjería"
+                  }
+                ]
+              },
+              {
+                "type": "TextInput",
+                "name": "invoice_nit",
+                "label": "N° Documento / NIT",
+                "required": false,
+                "helper-text": "Número de NIT o documento para facturar"
+              },
+              {
+                "type": "Footer",
+                "label": "Siguiente Paso",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "COMPANIONS_FIRST"
+                  },
+                  "payload": {
+                    "full_name": "${form.full_name}",
+                    "full_ape": "${form.full_ape}",
+                    "doc_number": "${form.doc_number}",
+                    "passport_number": "${form.passport_number}",
+                    "birth_date": "${form.birth_date}",
+                    "gender": "${form.gender}",
+                    "email": "${form.email}",
+                    "doc_telefonico": "${form.doc_telefonico}",
+                    "observation": "${form.observation}",
+                    "invoice_razon_social": "${form.invoice_razon_social}",
+                    "invoice_doc_type": "${form.invoice_doc_type}",
+                    "invoice_nit": "${form.invoice_nit}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "COMPANIONS_FIRST",
+      "title": "TAMep - Pasajeros 2 y 3",
+      "data": {
+        "full_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "full_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "doc_number": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "passport_number": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "birth_date": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "gender": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "email": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "doc_telefonico": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "observation": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_razon_social": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_doc_type": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_nit": {
+          "type": "string",
+          "__example__": "val"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "companions_first_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Acompañantes (1 de 2)"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Paso 2: Pasajeros 2 y 3"
+              },
+              {
+                "type": "TextBody",
+                "text": "Ingrese los datos de los primeros 2 acompañantes:"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Acompañante 1 (Pasajero 2)"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp1_name",
+                "label": "Nombres",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp1_ape",
+                "label": "Apellidos",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp1_doc",
+                "label": "CI / DNI",
+                "required": true,
+                "helper-text": "Ej: 8492015 o 8492015 LP"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp1_passport",
+                "label": "Pasaporte",
+                "required": false,
+                "helper-text": "Opcional (si viaja con pasaporte)"
+              },
+              {
+                "type": "DatePicker",
+                "name": "comp1_birth",
+                "label": "Fecha de Nacimiento",
+                "required": true,
+                "helper-text": "Día, mes y año de nacimiento"
+              },
+              {
+                "type": "Dropdown",
+                "name": "comp1_gender",
+                "label": "Género",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "Femenino",
+                    "title": "Femenino"
+                  },
+                  {
+                    "id": "Masculino",
+                    "title": "Masculino"
+                  }
+                ]
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Acompañante 2 (Pasajero 3)"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp2_name",
+                "label": "Nombres",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp2_ape",
+                "label": "Apellidos",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp2_doc",
+                "label": "CI / DNI",
+                "required": true,
+                "helper-text": "Ej: 8492015 o 8492015 LP"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp2_passport",
+                "label": "Pasaporte",
+                "required": false,
+                "helper-text": "Opcional (si viaja con pasaporte)"
+              },
+              {
+                "type": "DatePicker",
+                "name": "comp2_birth",
+                "label": "Fecha de Nacimiento",
+                "required": true,
+                "helper-text": "Día, mes y año de nacimiento"
+              },
+              {
+                "type": "Dropdown",
+                "name": "comp2_gender",
+                "label": "Género",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "Femenino",
+                    "title": "Femenino"
+                  },
+                  {
+                    "id": "Masculino",
+                    "title": "Masculino"
+                  }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Siguiente Paso",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "COMPANIONS_SECOND"
+                  },
+                  "payload": {
+                    "full_name": "${data.full_name}",
+                    "full_ape": "${data.full_ape}",
+                    "doc_number": "${data.doc_number}",
+                    "passport_number": "${data.passport_number}",
+                    "birth_date": "${data.birth_date}",
+                    "gender": "${data.gender}",
+                    "email": "${data.email}",
+                    "doc_telefonico": "${data.doc_telefonico}",
+                    "observation": "${data.observation}",
+                    "invoice_razon_social": "${data.invoice_razon_social}",
+                    "invoice_doc_type": "${data.invoice_doc_type}",
+                    "invoice_nit": "${data.invoice_nit}",
+                    "comp1_name": "${form.comp1_name}",
+                    "comp1_ape": "${form.comp1_ape}",
+                    "comp1_doc": "${form.comp1_doc}",
+                    "comp1_passport": "${form.comp1_passport}",
+                    "comp1_birth": "${form.comp1_birth}",
+                    "comp1_gender": "${form.comp1_gender}",
+                    "comp2_name": "${form.comp2_name}",
+                    "comp2_ape": "${form.comp2_ape}",
+                    "comp2_doc": "${form.comp2_doc}",
+                    "comp2_passport": "${form.comp2_passport}",
+                    "comp2_birth": "${form.comp2_birth}",
+                    "comp2_gender": "${form.comp2_gender}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "COMPANIONS_SECOND",
+      "title": "TAMep - Pasajeros 4 y 5",
+      "data": {
+        "full_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "full_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "doc_number": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "passport_number": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "birth_date": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "gender": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "email": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "doc_telefonico": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "observation": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_razon_social": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_doc_type": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_nit": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_doc": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_passport": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_birth": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_gender": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_doc": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_passport": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_birth": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_gender": {
+          "type": "string",
+          "__example__": "val"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "companions_second_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Acompañantes (2 de 2)"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Paso 3: Pasajeros 4 y 5"
+              },
+              {
+                "type": "TextBody",
+                "text": "Ingrese los datos de los acompañantes 4 y 5:"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Acompañante 3 (Pasajero 4)"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp3_name",
+                "label": "Nombres",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp3_ape",
+                "label": "Apellidos",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp3_doc",
+                "label": "CI / DNI",
+                "required": true,
+                "helper-text": "Ej: 8492015 o 8492015 LP"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp3_passport",
+                "label": "Pasaporte",
+                "required": false,
+                "helper-text": "Opcional (si viaja con pasaporte)"
+              },
+              {
+                "type": "DatePicker",
+                "name": "comp3_birth",
+                "label": "Fecha de Nacimiento",
+                "required": true,
+                "helper-text": "Día, mes y año de nacimiento"
+              },
+              {
+                "type": "Dropdown",
+                "name": "comp3_gender",
+                "label": "Género",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "Femenino",
+                    "title": "Femenino"
+                  },
+                  {
+                    "id": "Masculino",
+                    "title": "Masculino"
+                  }
+                ]
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Acompañante 4 (Pasajero 5)"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp4_name",
+                "label": "Nombres",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp4_ape",
+                "label": "Apellidos",
+                "required": true,
+                "helper-text": "Como figura en su documento"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp4_doc",
+                "label": "CI / DNI",
+                "required": true,
+                "helper-text": "Ej: 8492015 o 8492015 LP"
+              },
+              {
+                "type": "TextInput",
+                "name": "comp4_passport",
+                "label": "Pasaporte",
+                "required": false,
+                "helper-text": "Opcional (si viaja con pasaporte)"
+              },
+              {
+                "type": "DatePicker",
+                "name": "comp4_birth",
+                "label": "Fecha de Nacimiento",
+                "required": true,
+                "helper-text": "Día, mes y año de nacimiento"
+              },
+              {
+                "type": "Dropdown",
+                "name": "comp4_gender",
+                "label": "Género",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "Femenino",
+                    "title": "Femenino"
+                  },
+                  {
+                    "id": "Masculino",
+                    "title": "Masculino"
+                  }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Siguiente Paso",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "POLICIES_AND_TERMS"
+                  },
+                  "payload": {
+                    "full_name": "${data.full_name}",
+                    "full_ape": "${data.full_ape}",
+                    "doc_number": "${data.doc_number}",
+                    "passport_number": "${data.passport_number}",
+                    "birth_date": "${data.birth_date}",
+                    "gender": "${data.gender}",
+                    "email": "${data.email}",
+                    "doc_telefonico": "${data.doc_telefonico}",
+                    "observation": "${data.observation}",
+                    "invoice_razon_social": "${data.invoice_razon_social}",
+                    "invoice_doc_type": "${data.invoice_doc_type}",
+                    "invoice_nit": "${data.invoice_nit}",
+                    "comp1_name": "${data.comp1_name}",
+                    "comp1_ape": "${data.comp1_ape}",
+                    "comp1_doc": "${data.comp1_doc}",
+                    "comp1_passport": "${data.comp1_passport}",
+                    "comp1_birth": "${data.comp1_birth}",
+                    "comp1_gender": "${data.comp1_gender}",
+                    "comp2_name": "${data.comp2_name}",
+                    "comp2_ape": "${data.comp2_ape}",
+                    "comp2_doc": "${data.comp2_doc}",
+                    "comp2_passport": "${data.comp2_passport}",
+                    "comp2_birth": "${data.comp2_birth}",
+                    "comp2_gender": "${data.comp2_gender}",
+                    "comp3_name": "${form.comp3_name}",
+                    "comp3_ape": "${form.comp3_ape}",
+                    "comp3_doc": "${form.comp3_doc}",
+                    "comp3_passport": "${form.comp3_passport}",
+                    "comp3_birth": "${form.comp3_birth}",
+                    "comp3_gender": "${form.comp3_gender}",
+                    "comp4_name": "${form.comp4_name}",
+                    "comp4_ape": "${form.comp4_ape}",
+                    "comp4_doc": "${form.comp4_doc}",
+                    "comp4_passport": "${form.comp4_passport}",
+                    "comp4_birth": "${form.comp4_birth}",
+                    "comp4_gender": "${form.comp4_gender}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "POLICIES_AND_TERMS",
+      "title": "Confirmación y Políticas",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "full_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "full_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "doc_number": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "passport_number": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "birth_date": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "gender": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "email": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "doc_telefonico": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "observation": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_razon_social": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_doc_type": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "invoice_nit": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_doc": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_passport": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_birth": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp1_gender": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_doc": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_passport": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_birth": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp2_gender": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp3_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp3_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp3_doc": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp3_passport": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp3_birth": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp3_gender": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp4_name": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp4_ape": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp4_doc": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp4_passport": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp4_birth": {
+          "type": "string",
+          "__example__": "val"
+        },
+        "comp4_gender": {
+          "type": "string",
+          "__example__": "val"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "policies_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Términos y Privacidad"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Confirmación Oficial de Emisión"
+              },
+              {
+                "type": "TextBody",
+                "text": "Para finalizar su solicitud de emisión a EPTAM, revise y marque ambas casillas de aceptación obligatoria:"
+              },
+              {
+                "type": "OptIn",
+                "name": "terms_accepted",
+                "label": "Acepto Términos y Condiciones",
+                "required": true,
+                "on-click-action": {
+                  "name": "navigate",
+                  "payload": {},
+                  "next": {
+                    "type": "screen",
+                    "name": "TERMS_CONDITIONS"
+                  }
+                }
+              },
+              {
+                "type": "OptIn",
+                "name": "privacy_accepted",
+                "label": "Acepto Política de Privacidad",
+                "required": true,
+                "on-click-action": {
+                  "name": "navigate",
+                  "payload": {},
+                  "next": {
+                    "type": "screen",
+                    "name": "PRIVACY_POLICY"
+                  }
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Confirmar Reserva",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "full_name": "${data.full_name}",
+                    "full_ape": "${data.full_ape}",
+                    "doc_number": "${data.doc_number}",
+                    "passport_number": "${data.passport_number}",
+                    "birth_date": "${data.birth_date}",
+                    "gender": "${data.gender}",
+                    "email": "${data.email}",
+                    "doc_telefonico": "${data.doc_telefonico}",
+                    "observation": "${data.observation}",
+                    "invoice_razon_social": "${data.invoice_razon_social}",
+                    "invoice_doc_type": "${data.invoice_doc_type}",
+                    "invoice_nit": "${data.invoice_nit}",
+                    "comp1_name": "${data.comp1_name}",
+                    "comp1_ape": "${data.comp1_ape}",
+                    "comp1_doc": "${data.comp1_doc}",
+                    "comp1_passport": "${data.comp1_passport}",
+                    "comp1_birth": "${data.comp1_birth}",
+                    "comp1_gender": "${data.comp1_gender}",
+                    "comp2_name": "${data.comp2_name}",
+                    "comp2_ape": "${data.comp2_ape}",
+                    "comp2_doc": "${data.comp2_doc}",
+                    "comp2_passport": "${data.comp2_passport}",
+                    "comp2_birth": "${data.comp2_birth}",
+                    "comp2_gender": "${data.comp2_gender}",
+                    "comp3_name": "${data.comp3_name}",
+                    "comp3_ape": "${data.comp3_ape}",
+                    "comp3_doc": "${data.comp3_doc}",
+                    "comp3_passport": "${data.comp3_passport}",
+                    "comp3_birth": "${data.comp3_birth}",
+                    "comp3_gender": "${data.comp3_gender}",
+                    "comp4_name": "${data.comp4_name}",
+                    "comp4_ape": "${data.comp4_ape}",
+                    "comp4_doc": "${data.comp4_doc}",
+                    "comp4_passport": "${data.comp4_passport}",
+                    "comp4_birth": "${data.comp4_birth}",
+                    "comp4_gender": "${data.comp4_gender}",
+                    "terms_accepted": "${form.terms_accepted}",
+                    "privacy_accepted": "${form.privacy_accepted}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "TERMS_CONDITIONS",
+      "title": "Términos y Condiciones",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Términos y Condiciones"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Formulario de Registro de Pasajeros – EPTAM"
+          },
+          {
+            "type": "TextBody",
+            "text": "Al completar y enviar este formulario, el usuario acepta los siguientes términos y condiciones:\n\n*1. Información proporcionada:*\nEl usuario declara que los datos registrados son verdaderos, completos y actualizados, y que corresponden al pasajero que realizará el viaje.\n\n*2. Registro y prestación del servicio:*\nLos datos proporcionados serán utilizados para gestionar el registro del pasajero, reserva, compra y/o emisión del boleto, así como para administrar cualquier modificación, cancelación, devolución, consulta o reclamo relacionado con el servicio.\n\n*3. Responsabilidad del usuario:*\nEl pasajero será responsable de verificar que sus nombres, apellidos, documento de identidad, teléfono y correo electrónico hayan sido registrados correctamente.\n\n*4. Comunicaciones:*\nEPTAM podrá utilizar los datos de contacto proporcionados para enviar información relacionada con la reserva, boleto, viaje, modificaciones, cancelaciones y otros aspectos necesarios para la prestación del servicio.\n\n*5. Uso del canal WhatsApp:*\nEl presente formulario forma parte del proceso de atención digital de EPTAM mediante WhatsApp. El usuario reconoce que dicho servicio utiliza plataformas tecnológicas de terceros.\n\n*6. Seguridad:*\nEPTAM adoptará medidas razonables para proteger la información proporcionada y prevenir accesos o usos no autorizados.\n\n*7. Aceptación:*\nAl marcar la casilla correspondiente y enviar el formulario, el usuario declara haber leído y aceptado estos Términos y Condiciones.\n\n_(Utilice la flecha superior izquierda para regresar al formulario y continuar)_"
+          }
+        ]
+      }
+    },
+    {
+      "id": "PRIVACY_POLICY",
+      "title": "Política de Privacidad",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Política de Privacidad"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Formulario de Registro de Pasajeros – EPTAM"
+          },
+          {
+            "type": "TextBody",
+            "text": "EPTAM respeta la privacidad de sus usuarios y protege los datos personales proporcionados mediante el Chatbot de WhatsApp y sus formularios digitales.\n\n*1. Datos recopilados:*\nPodrán recopilarse los siguientes datos: nombres, apellidos, tipo y número de documento de identidad, número telefónico y correo electrónico, además de información necesaria para gestionar el servicio solicitado.\n\n*2. Finalidad:*\nLos datos serán utilizados para el registro e identificación del pasajero, reserva, compra y emisión de boletos, atención de consultas y reclamos, envío de información relacionada con el servicio y cumplimiento de obligaciones legales.\n\n*3. Confidencialidad:*\nEPTAM tratará los datos personales de forma confidencial y aplicará medidas técnicas y organizativas razonables para protegerlos contra acceso, pérdida, modificación o divulgación no autorizada.\n\n*4. Proveedores tecnológicos:*\nPara prestar sus servicios digitales, EPTAM podrá utilizar plataformas y proveedores tecnológicos. Cuando corresponda, estos podrán procesar información únicamente para las finalidades necesarias para la prestación del servicio.\n\n*5. Conservación:*\nLos datos serán conservados durante el tiempo necesario para cumplir las finalidades para las cuales fueron recopilados y las obligaciones legales o administrativas aplicables.\n\n*6. Derechos del titular:*\nEl titular podrá solicitar, conforme a la normativa aplicable, el acceso, rectificación, actualización, cancelación, oposición o revocación respecto del tratamiento de sus datos personales.\n\nAl marcar la casilla correspondiente, el usuario declara haber leído la presente Política de Privacidad y acepta el tratamiento de sus datos para las finalidades descritas.\n\n_(Utilice la flecha superior izquierda para regresar al formulario y continuar)_"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "version": "7.3",
+  "screens": [
+    {
+      "id": "FLIGHT_SEARCH",
+      "title": "Búsqueda de Vuelos",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "flight_search_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "                  EPTAM"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Selecciona tu itinerario, fecha y pasajeros:"
+              },
+              {
+                "type": "Dropdown",
+                "name": "trip_type",
+                "label": "Tipo de Viaje",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "ONE_WAY",
+                    "title": "Solo Ida"
+                  },
+                  {
+                    "id": "ROUND_TRIP",
+                    "title": "Ida y Vuelta"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "origin",
+                "label": "Origen",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "VVI",
+                    "title": "Santa Cruz (VVI)"
+                  },
+                  {
+                    "id": "LPB",
+                    "title": "La Paz (LPB)"
+                  },
+                  {
+                    "id": "CBB",
+                    "title": "Cochabamba (CBB)"
+                  },
+                  {
+                    "id": "CIJ",
+                    "title": "Cobija (CIJ)"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "destination",
+                "label": "Destino",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "LPB",
+                    "title": "La Paz (LPB)"
+                  },
+                  {
+                    "id": "VVI",
+                    "title": "Santa Cruz (VVI)"
+                  },
+                  {
+                    "id": "CBB",
+                    "title": "Cochabamba (CBB)"
+                  },
+                  {
+                    "id": "CIJ",
+                    "title": "Cobija (CIJ)"
+                  }
+                ]
+              },
+              {
+                "type": "DatePicker",
+                "name": "flight_date",
+                "label": "Fecha de Ida",
+                "required": true,
+                "helper-text": "Selecciona el día de salida"
+              },
+              {
+                "type": "DatePicker",
+                "name": "return_date",
+                "label": "Fecha de Retorno",
+                "required": false,
+                "helper-text": "Opcional si tu viaje es solo ida"
+              },
+              {
+                "type": "TextInput",
+                "name": "adults",
+                "label": "Adultos (+12 años)",
+                "input-type": "number",
+                "required": true,
+                "helper-text": "Cantidad de adultos (mínimo 1)"
+              },
+              {
+                "type": "TextInput",
+                "name": "children",
+                "label": "Niños (2-11 años)",
+                "input-type": "number",
+                "required": false,
+                "helper-text": "Menores de 2 a 11 años (opcional)"
+              },
+              {
+                "type": "TextInput",
+                "name": "babies",
+                "label": "Bebés (< 2 años)",
+                "input-type": "number",
+                "required": false,
+                "helper-text": "Opcional (dejar vacío si no viajan)"
+              },
+              {
+                "type": "Footer",
+                "label": "Buscar Vuelos",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "trip_type": "${form.trip_type}",
+                    "origin": "${form.origin}",
+                    "destination": "${form.destination}",
+                    "flight_date": "${form.flight_date}",
+                    "return_date": "${form.return_date}",
+                    "adults": "${form.adults}",
+                    "children": "${form.children}",
+                    "babies": "${form.babies}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

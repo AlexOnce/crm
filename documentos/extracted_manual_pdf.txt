@@ -1,0 +1,248 @@
+=== PAGE 1 ===
+Documentación de Servicios - REST API AirClick 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Documentación de Servicios  
+REST API 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+=== PAGE 2 ===
+Documentación de Servicios - API AirClick 
+REST API AirClick 
+ 
+1. Introducción. 
+En la presente documentación, se publican los métodos para las consultas de aeropuertos y 
+obtención de vuelos.  
+2. Autenticación. 
+La forma de autenticación para c onsumir los métodos es a través  de un token que será 
+proporcionado por Transclick Solutions.  
+3. GET: airports. 
+Con éste método se obtendrán la lista de aeropuertos configurados. 
+ 
+● Link 
+https://tsagair.transclicksolutions.com/sales/public/airports 
+ 
+● Params  
+ 
+Key Value Description 
+token string valor proporcionado 
+ 
+● Response 
+ 
+Key Value Description 
+airport 
+● iataCode 
+● name 
+● city 
+ { 
+   "iataCode": "CBB", 
+   "name": "Aeropuerto 
+Internacional Jorge 
+Wilstermann", 
+   "city": "Cercado" 
+} 
+información de la estructura de 
+aeropuerto 
+- iataCode(string), código iata del 
+aeropuerto 
+- name(string), nombre del 
+aeropuerto 
+- city(string), ciudad o región 
+donde se encuentra el aeropuerto 
+status code - codigo(int), 200 Ok en caso de 
+éxito, 400 en caso de error se 
+indicará el error 
+ 
+
+=== PAGE 3 ===
+Documentación de Servicios - API AirClick 
+4. GET: flights. 
+Con éste método se obtendrán los vuelos solicitados, siempre qu e cumpla con las 
+condiciones requeridas. 
+ 
+● Link 
+https://tsagair.transclicksolutions.com/sales/public/flights 
+ 
+● Params  
+ 
+Key Value Description 
+token string valor proporcionado 
+originIata string enviar código iata del aeropuerto 
+destinyIata  string enviar código iata del aeropuerto 
+adults  int número de adultos para hacer la solicitud, 
+mayor o igual a 0 y menor que 5 
+children  int número de niños para hacer la solicitud, 
+mayor o igual a 0 y menor que 5 
+babies  int número de infantes para hacer la 
+solicitud, mayor o igual a 0 y menor que 5 
+departureDate  string enviar la fecha que desea hacer la 
+solicitud en el siguiente formato yyyy-
+MM-dd hh:ss 
+ 
+● Response 
+ 
+Key Value Description 
+week 
+● date 
+● has 
+"week": [ { 
+   "date": "2026-08-27", 
+   "has": true} 
+] 
+ 
+Devuelve los estados de vuelos 
+para una semana, iniciando el dia 
+de solicitud de vuelos donde: 
+- date(string), fecha del día 
+formato yyyy-MM-dd 
+
+=== PAGE 4 ===
+Documentación de Servicios - API AirClick 
+- has(boolean), si el día tiene 
+vuelos 
+flights 
+● number 
+● seats 
+● totalAmount 
+● departureD
+ate 
+● departureTi
+me 
+● arrivalDate 
+● arrivalTime 
+● origin 
+● destiny 
+● connections 
+"flights": [{ 
+   "number": "890", 
+   "seats": 91, 
+   "totalAmount": 1268, 
+   "departureDate": "2026-08-27", 
+   "departureTime": "07:45", 
+   "arrivalDate": "2026-08-27", 
+   "arrivalTime": "08:20", 
+   "origin": {airport} 
+   "destiny": {airport}, 
+   "connections": [{connection}] 
+ 
+Devuelve la lista de vuelos 
+disponibles para la solicitud 
+realizada 
+- number(string), numero o 
+identificativo de vuelo 
+- seats(int), asientos disponibles 
+- totalAmount(double), precio 
+total del vuelo para la candida de 
+pasajeros solicitados 
+- departureDate(string), fecha de 
+salida del vuelo, formato yyyy-
+MM-dd 
+- departureTime(string), hora de 
+salida del vuelo, formato hh:ss 
+- arrivalDate(string), fecha de 
+llegada del vuelo, formato yyyy-
+MM-dd 
+- arrivalTime(string), hora de 
+salida del vuelo, formato hh:ss 
+- origin(airport), información del 
+aeropuerto de origen, abajo está 
+su detalle 
+- destiny(airport), información del 
+aeropuerto de destino abajo está 
+su detalle 
+- connections(list[connection]), 
+lista de conexiones o segmentos 
+del vuelo, abajo se detalla su 
+estructura  
+connection 
+● number 
+● departureD
+ate 
+● departureTi
+me 
+● arrivalDate 
+{ 
+   "number": "890", 
+   "departureDate": "2026-08-27", 
+   "departureTime": "07:45", 
+   "arrivalDate": "2026-08-27", 
+   "arrivalTime": "08:20", 
+   “origin": {airport}, 
+- number(string), numero o 
+identificativo de vuelo 
+- departureDate(string), fecha de 
+salida del vuelo, formato yyyy-
+MM-dd 
+- departureTime(string), hora de 
+salida del vuelo, formato hh:ss 
+- arrivalDate(string), fecha de 
+
+=== PAGE 5 ===
+Documentación de Servicios - API AirClick 
+● arrivalTime 
+● origin 
+● destiny 
+   "destiny": {airport} 
+} 
+llegada del vuelo, formato yyyy-
+MM-dd 
+- arrivalTime(string), hora de 
+salida del vuelo, formato hh:ss 
+- origin(airport), información del 
+aeropuerto de origen, abajo está 
+su detalle 
+- destiny(airport), información del 
+aeropuerto de destino abajo está 
+su detalle 
+airport 
+● iataCode 
+● name 
+● city 
+ { 
+   "iataCode": "CBB", 
+   "name": "Aeropuerto 
+Internacional Jorge 
+Wilstermann", 
+   "city": "Cercado" 
+} 
+información de la estructura de 
+aeropuerto 
+- iataCode(string), código iata del 
+aeropuerto 
+- name(string), nombre del 
+aeropuerto 
+- city(string), ciudad o región 
+donde se encuentra el aeropuerto 
+status code - codigo(int), 200 Ok en caso de 
+éxito, 400 en caso de error se 
+indicará el error 
+ 
+
