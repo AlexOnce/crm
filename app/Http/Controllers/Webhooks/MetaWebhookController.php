@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Services\ChatbotEngineService;
 use App\Services\MetaWhatsAppService;
+use App\Services\WhatsAppWebhookService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -33,8 +34,12 @@ class MetaWebhookController extends Controller
     /**
      * Recepción de eventos y mensajes en tiempo real desde Meta Cloud API (POST)
      */
-    public function handle(Request $request, ChatbotEngineService $engine, MetaWhatsAppService $whatsapp): Response
-    {
+    public function handle(
+        Request $request,
+        ChatbotEngineService $engine,
+        MetaWhatsAppService $whatsapp,
+        WhatsAppWebhookService $webhookService
+    ): Response {
         // 0. Verificación Criptográfica de la Firma (X-Hub-Signature-256) si app_secret está configurado
         $appSecret = (string) config('services.meta.app_secret');
         if (! empty($appSecret)) {
@@ -109,6 +114,21 @@ class MetaWebhookController extends Controller
         switch ($type) {
             case 'text':
                 $text = $messageObj['text']['body'] ?? '';
+
+                // Interceptar códigos de verificación OTP (Meta / Facebook Page Linking)
+                if ($webhookService->isVerificationCode($text)) {
+                    $intercepted = $webhookService->detectAndCaptureVerificationCode(
+                        $text,
+                        $phone,
+                        ['wam_id' => $wamId, 'raw_message' => $messageObj]
+                    );
+
+                    if ($intercepted) {
+                        Log::info("MetaWebhookController: Código OTP ({$intercepted->code}) interceptado con éxito. Omitiendo apertura de chat comercial.");
+
+                        return response('EVENT_RECEIVED', 200);
+                    }
+                }
                 break;
             case 'audio':
                 $mediaType = 'audio';
@@ -236,7 +256,7 @@ class MetaWebhookController extends Controller
                             }
                         }
                         if (! empty($comps)) {
-                            $text .= "\n👥 *Acompañantes en Formulario:*\n" . implode("\n", $comps) . "\n";
+                            $text .= "\n👥 *Acompañantes en Formulario:*\n".implode("\n", $comps)."\n";
                         }
 
                         $termsAccepted = ! empty($flowData['terms_accepted']) || ! empty($flowData['privacy_terms']);
@@ -287,6 +307,9 @@ class MetaWebhookController extends Controller
                 $conversation->update(['session_data' => $session]);
             }
         }
+
+        // 4.1 Extraer y registrar atribución de anuncios y botones nativos (Referral / CTWA 72h window)
+        $webhookService->extractAndApplyReferral($conversation, $messageObj);
 
         // 5. Procesar por el motor del chatbot y CRM con multimedia y datos de flow
         try {

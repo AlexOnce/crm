@@ -4,9 +4,12 @@ use App\Events\ChatMessageSent;
 use App\Events\ConversationUpdated;
 use App\Models\ChatMessage;
 use App\Models\Conversation;
+use App\Models\Lead;
 use App\Models\User;
 use App\Services\BroadcastHelper;
+use App\Services\ChatbotEngineService;
 use App\Services\MetaWhatsAppService;
+use App\Services\WhatsAppWebhookService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
@@ -401,3 +404,220 @@ Artisan::command('crm:auto-release-inactive {--minutes=30} {--notify}', function
 })->purpose('Reactivar el bot automáticamente en conversaciones humanas inactivas por más de 30 minutos');
 
 Schedule::command('crm:auto-release-inactive')->everyFiveMinutes();
+
+/*
+|--------------------------------------------------------------------------
+| Comando de Simulación: Flow con 5 Pasajeros y 3 Llenados
+|--------------------------------------------------------------------------
+*/
+Artisan::command('crm:simulate-partial-pax {--phone=59178541236}', function (ChatbotEngineService $engine) {
+    $phone = (string) $this->option('phone');
+
+    $this->info('=== SIMULANDO REGISTRO DE 5 PASAJEROS CON 3 LLENADOS ===');
+    $this->line("Teléfono de simulación: {$phone}");
+
+    // 1. Crear o reiniciar conversación de prueba con sesión previa de 5 PAX
+    $conv = Conversation::updateOrCreate(
+        ['phone' => $phone],
+        [
+            'contact_name' => 'Carlos Montaño',
+            'status' => 'bot_active',
+            'current_state' => 'R2_SOLICITAR_DATOS',
+            'last_interaction_at' => now(),
+            'session_data' => [
+                'origin' => 'LPB',
+                'destination' => 'VVI',
+                'flight_date' => '2026-10-15',
+                'passengers' => 5,
+                'passengers_count' => 5,
+                'adults' => 5,
+                'children' => 0,
+                'babies' => 0,
+                'selected_flight' => [
+                    'flight_number' => 'TM-705',
+                    'departure_time' => '08:30',
+                    'arrival_time' => '09:35',
+                    'aircraft' => 'Avro RJ70',
+                    'price' => 4215.00,
+                ],
+            ],
+        ]
+    );
+
+    // 2. Datos que Meta devolvería en el Flow (5 solicitados, pero solo 3 personas llenadas)
+    $flowData = [
+        'full_name' => 'Carlos Eduardo',
+        'full_ape' => 'Montaño Salvatierra',
+        'doc_type' => 'CI',
+        'doc_number' => '7821940 SC',
+        'gender' => 'Masculino',
+        'birth_date' => '1988-04-15',
+        'doc_telefonico' => '+59178541236',
+        'email' => 'carlos.montano@gmail.com',
+        'passengers_count' => 5,
+        'comp1_name' => 'Mariana',
+        'comp1_ape' => 'Roca Banzer',
+        'comp1_doc' => '8912345 SC',
+        'comp1_gender' => 'Femenino',
+        'comp1_birth' => '1992-08-22',
+        'comp2_name' => 'Lucas',
+        'comp2_ape' => 'Montaño Roca',
+        'comp2_doc' => '12984561 SC',
+        'comp2_gender' => 'Masculino',
+        'comp2_birth' => '2018-11-10',
+        'observation' => 'Requiere asiento junto a la ventana para el menor',
+        'invoice_razon_social' => 'Montaño Servicios SRL',
+        'invoice_doc_type' => 'NIT',
+        'invoice_nit' => '3490182019',
+        'terms_accepted' => true,
+        'privacy_accepted' => true,
+    ];
+
+    // 3. Texto del formulario tal como lo genera MetaWebhookController
+    $cardText = "📋 *DATOS DE PASAJERO REGISTRADOS (FORMULARIO)*\n"
+              ."👤 *Pasajero:* Carlos Eduardo Montaño Salvatierra\n"
+              ."📄 *Documento:* CI 7821940 SC\n"
+              ."👥 *Pasajeros:* 5\n"
+              ."📱 *Teléfono:* +59178541236\n"
+              ."✉️ *Email:* carlos.montano@gmail.com\n"
+              ."🎂 *F. Nacimiento:* 1988-04-15\n"
+              ."🧾 *Factura:* Razón Social: Montaño Servicios SRL | Tipo: NIT | NIT/Doc: 3490182019\n"
+              ."🧳 *Equipaje/Req:* Requiere asiento junto a la ventana para el menor\n\n"
+              ."👥 *Acompañantes en Formulario:*\n"
+              ."2. Mariana Roca Banzer (8912345 SC)\n"
+              ."3. Lucas Montaño Roca (12984561 SC)\n\n"
+              .'🔒 *Términos y Privacidad:* Aceptados ✅';
+
+    // 4. Procesar a través del motor del Chatbot
+    $engine->processIncomingMessage(
+        conversation: $conv,
+        text: $cardText,
+        mediaUrl: null,
+        mediaType: null,
+        flowData: $flowData
+    );
+
+    $conv->refresh();
+    $lead = Lead::where('conversation_id', $conv->id)->latest('id')->first();
+    $lastMsg = ChatMessage::where('conversation_id', $conv->id)->latest('id')->first();
+
+    $this->info('✅ Simulación completada con éxito:');
+    $this->line(" - Conversación ID: {$conv->id}");
+    $this->line(" - Contacto: {$conv->contact_name} ({$conv->phone})");
+    $this->line(" - Estado: {$conv->status} ({$conv->current_state})");
+    $this->line(' - Lead creado ID: '.($lead?->id ?? 'N/A'));
+    $this->line(' - Lead detalles: '.($lead?->details ?? 'N/A'));
+    $this->newLine();
+    $this->info('📨 Mensaje enviado por el bot:');
+    $this->line($lastMsg?->message ?? 'N/A');
+
+    return 0;
+})->purpose('Simular envío de Flow con 5 pasajeros y solo 3 datos llenados');
+
+Artisan::command('meta:simulate-otp {code=582914} {sender=16505550100}', function (WhatsAppWebhookService $service, $code = '582914', $sender = '16505550100') {
+    $this->info('=== SIMULANDO RECEPCIÓN DE CÓDIGO OTP DE META / FACEBOOK ===');
+    $simulatedText = "Tu código de confirmación de Facebook es {$code}. No lo compartas con nadie.";
+
+    $record = $service->detectAndCaptureVerificationCode(
+        body: $simulatedText,
+        senderPhone: $sender,
+        metadata: ['simulated' => true, 'timestamp' => time()]
+    );
+
+    if ($record) {
+        $this->info('✅ Código OTP detectado, guardado y emitido vía WebSockets:');
+        $this->line(" - Código: {$record->code}");
+        $this->line(" - Servicio: {$record->service}");
+        $this->line(" - Remitente: {$record->sender_phone}");
+        $this->line(" - Expira: {$record->expires_at}");
+        $this->newLine();
+        $this->comment('👉 Si tienes el CRM abierto en el navegador, el Toast flotante apareció en la esquina superior derecha.');
+    } else {
+        $this->error('❌ El servicio no detectó el texto como OTP.');
+    }
+
+    return 0;
+})->purpose('Simular código de verificación OTP de Meta para visualizar la notificación flotante en el CRM');
+
+Artisan::command('meta:simulate-ad {phone=59178999888} {headline?}', function (WhatsAppWebhookService $service, $phone = '59178999888', $headline = null) {
+    $this->info('=== SIMULANDO ATRIBUCIÓN DE ANUNCIO META (CLICK-TO-WHATSAPP) ===');
+    $headlineText = $headline ?: 'Campaña Vuelos Promo 30% Off';
+
+    $conv = Conversation::firstOrCreate(
+        ['phone' => $phone],
+        [
+            'contact_name' => 'Pasajero Interesado (Meta Ads)',
+            'status' => 'human_live',
+            'current_state' => 'HUMAN_SUPPORT',
+        ]
+    );
+
+    $service->extractAndApplyReferral($conv, [
+        'source_type' => 'ad',
+        'source_id' => '23847293847298',
+        'source_url' => 'https://facebook.com/ads/sample-vuelos',
+        'headline' => $headlineText,
+        'body' => '¡Reserva tus pasajes con descuento de temporada! Oferta por tiempo limitado.',
+        'media_type' => 'image',
+    ]);
+
+    $conv->refresh();
+    BroadcastHelper::safeBroadcast(new ConversationUpdated($conv));
+
+    $this->info('✅ Atribución de anuncio aplicada a la conversación:');
+    $this->line(" - Conversación ID: {$conv->id}");
+    $this->line(" - Teléfono: +{$conv->phone}");
+    $this->line(" - Campaña / Headline: {$conv->headline}");
+    $this->line(" - Ventana 72h expira: {$conv->free_window_expires_at} ({$conv->remaining_free_window_hours} horas restantes)");
+
+    return 0;
+})->purpose('Simular conversación iniciada desde anuncio de Facebook');
+
+Artisan::command('meta:simulate-ad-user {name=Valeria Morales} {phone=59176543210} {headline=Promo Vuelos Directos 30% Off}', function (WhatsAppWebhookService $webhookService, ChatbotEngineService $engine, $name = 'Valeria Morales', $phone = '59176543210', $headline = 'Promo Vuelos Directos 30% Off') {
+    $this->info('=== SIMULANDO USUARIO ENTRANTE DESDE PUBLICIDAD DE FACEBOOK (CLICK-TO-WHATSAPP) ===');
+
+    // 1. Crear o reiniciar conversación limpia para la prueba
+    $conv = Conversation::firstOrNew(['phone' => $phone]);
+    $conv->contact_name = $name;
+    $conv->status = 'bot_active';
+    $conv->current_state = 'MENU_PRINCIPAL';
+    $conv->last_interaction_at = now();
+    $conv->session_data = [];
+    $conv->save();
+
+    // 2. Aplicar atribución de anuncio con ventana de 72 horas gratis de Meta
+    $webhookService->extractAndApplyReferral($conv, [
+        'source_type' => 'ad',
+        'source_id' => '23851948201948',
+        'source_url' => 'https://facebook.com/ads/promo-vuelos',
+        'headline' => $headline,
+        'body' => '¡Reserva tus vuelos nacionales con 30% de descuento! Cupos limitados para esta temporada.',
+        'media_type' => 'image',
+    ]);
+
+    $conv->refresh();
+
+    // 3. Simular mensaje del usuario que hace clic en el anuncio
+    $incomingText = 'Hola, vi su anuncio de vuelos en Facebook y quiero consultar tarifas y fechas disponibles.';
+    $engine->processIncomingMessage(
+        conversation: $conv,
+        text: $incomingText,
+        mediaUrl: null,
+        mediaType: null
+    );
+
+    $conv->refresh();
+    $lastBotMsg = ChatMessage::where('conversation_id', $conv->id)->where('sender', 'bot')->latest('id')->first();
+
+    $this->info('✅ Simulación ejecutada con éxito:');
+    $this->line(" 👤 Pasajero: {$conv->contact_name} (+{$conv->phone})");
+    $this->line(" 📢 Anuncio de Origen: {$conv->headline}");
+    $this->line(" 🟢 Ventana Gratuita 72h: {$conv->free_window_expires_at} ({$conv->remaining_free_window_hours} horas restantes)");
+    $this->line(" 💬 Mensaje del Pasajero: \"{$incomingText}\"");
+    $this->line(' 🤖 Respuesta del Bot: '.mb_substr($lastBotMsg?->message ?? 'Sin respuesta', 0, 70).'...');
+    $this->newLine();
+    $this->comment("👉 Abre el CRM en tu navegador: verás a '{$conv->contact_name}' en la lista de chats.");
+    $this->comment("👉 Al hacer clic en su chat, en la cabecera verás su nombre y el distintivo minimalista [🟢 72h Gratis ({$conv->remaining_free_window_hours}h)].");
+
+    return 0;
+})->purpose('Simular usuario completo que entra desde anuncio de Facebook con mensaje y respuesta del bot');

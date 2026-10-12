@@ -69,8 +69,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/push/unsubscribe', [PushSubscriptionController::class, 'unsubscribe']);
     Route::post('/push/test', [PushSubscriptionController::class, 'test']);
 
-    // Emisión Transaccional de Boletos
+    // Emisión Transaccional y Gestión de Boletos / Leads
     Route::post('/leads/{lead}/issue-ticket', [FlightBookingController::class, 'issueTicket']);
+    Route::post('/conversations/{conversation}/lead', [FlightBookingController::class, 'storeManualLead']);
+    Route::put('/leads/{lead}', [FlightBookingController::class, 'updateLead']);
 
     // Consulta de Itinerarios en Tiempo Real
     Route::get('/flights/search', function (Request $request, FlightMicroservice $flightService) {

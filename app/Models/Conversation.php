@@ -21,14 +21,64 @@ class Conversation extends Model
         'session_data',
         'assigned_user_id',
         'last_interaction_at',
+        'source_type',
+        'source_id',
+        'source_url',
+        'headline',
+        'body',
+        'referral_data',
+        'free_window_expires_at',
     ];
 
     protected function casts(): array
     {
         return [
             'session_data' => 'array',
+            'referral_data' => 'array',
             'last_interaction_at' => 'datetime',
+            'free_window_expires_at' => 'datetime',
         ];
+    }
+
+    protected $appends = [
+        'remaining_free_window_hours',
+        'is_free_window_active',
+    ];
+
+    /**
+     * Determina si la ventana de 72 horas gratuitas de atención Meta está activa.
+     */
+    public function isFreeWindowActive(): bool
+    {
+        return $this->free_window_expires_at !== null && $this->free_window_expires_at->isFuture();
+    }
+
+    /**
+     * Accessor reactivo para el frontend Vue.js.
+     */
+    public function getIsFreeWindowActiveAttribute(): bool
+    {
+        return $this->isFreeWindowActive();
+    }
+
+    /**
+     * Obtiene las horas restantes de la ventana gratuita de 72 horas.
+     */
+    public function getRemainingFreeWindowHoursAttribute(): int
+    {
+        if (! $this->isFreeWindowActive()) {
+            return 0;
+        }
+
+        return max(0, (int) now()->diffInHours($this->free_window_expires_at, false));
+    }
+
+    /**
+     * Indica si el cliente inició la conversación mediante un anuncio o botón de Facebook.
+     */
+    public function getHasReferralAttribute(): bool
+    {
+        return ! empty($this->source_type) || ! empty($this->referral_data);
     }
 
     public function messages(): HasMany

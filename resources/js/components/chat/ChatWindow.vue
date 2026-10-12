@@ -28,12 +28,13 @@
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-sky-600 to-indigo-700 flex items-center justify-center font-bold text-white text-xs sm:text-sm shadow-md shadow-sky-900/20 shrink-0">
             {{ (chatStore.activeConversation.contact_name || chatStore.activeConversation.phone).substring(0, 2).toUpperCase() }}
           </div>
-          <div class="min-w-0">
-            <h3 class="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[260px]">
+          <div class="min-w-0 flex flex-col justify-center">
+            <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
               {{ chatStore.activeConversation.contact_name || 'Pasajero de WhatsApp' }}
             </h3>
-            <div class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 truncate">
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 flex items-center gap-2 truncate">
               <span>+{{ chatStore.activeConversation.phone }}</span>
+              <ChatReferralBadge :conversation="chatStore.activeConversation" />
             </div>
           </div>
         </div>
@@ -896,6 +897,7 @@ import {
 import { useChatStore } from '@/stores/useChatStore';
 import api from '@/api/client';
 import { isInteractiveButtonReply, getInteractiveButtonDetails } from '@/services/messageFormatter';
+import ChatReferralBadge from '@/components/chat/ChatReferralBadge.vue';
 
 const emit = defineEmits(['open-booking', 'back']);
 const chatStore = useChatStore();

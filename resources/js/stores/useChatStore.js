@@ -481,5 +481,43 @@ export const useChatStore = defineStore('chat', {
                 this.issuingTicket = false;
             }
         },
+
+        async saveManualLead(formData) {
+            if (!this.activeConversation) return { success: false, message: 'No hay conversación activa' };
+            this.issuingTicket = true;
+            try {
+                let res;
+                if (this.activeLead && this.activeLead.id) {
+                    res = await api.put(`/leads/${this.activeLead.id}`, formData);
+                } else {
+                    res = await api.post(`/conversations/${this.activeConversation.id}/lead`, formData);
+                }
+
+                if (res.data.success && res.data.lead) {
+                    this.activeLead = res.data.lead;
+                    if (!Array.isArray(this.leads)) {
+                        this.leads = [];
+                    }
+                    const idx = this.leads.findIndex((l) => l.id === res.data.lead.id);
+                    if (idx !== -1) {
+                        this.leads[idx] = res.data.lead;
+                    } else {
+                        this.leads.unshift(res.data.lead);
+                    }
+                    // Actualizar nombre de contacto en activeConversation si estaba vacío
+                    if (this.activeConversation && !this.activeConversation.contact_name && formData.passenger_name) {
+                        this.activeConversation.contact_name = formData.passenger_name;
+                    }
+                    this.fetchConversations(true);
+                    return { success: true, lead: res.data.lead };
+                }
+                return { success: false, message: res.data.message || 'Error al guardar reserva' };
+            } catch (err) {
+                const msg = err.response?.data?.message || 'Error al guardar la reserva';
+                return { success: false, message: msg };
+            } finally {
+                this.issuingTicket = false;
+            }
+        },
     },
 });

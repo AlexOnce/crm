@@ -97,7 +97,7 @@
           class="fixed inset-0 z-50 lg:hidden flex justify-end bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-sm"
           @click.self="showMobileBooking = false"
         >
-          <div class="w-full sm:w-96 max-w-[92vw] h-full shadow-2xl flex flex-col bg-slate-200 dark:bg-slate-200">
+          <div class="w-full sm:w-[350px] max-w-[92vw] h-full shadow-2xl flex flex-col bg-slate-900 dark:bg-slate-800">
             <TicketBookingPanel is-mobile @close="showMobileBooking = false" />
           </div>
         </div>

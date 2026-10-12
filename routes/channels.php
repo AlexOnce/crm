@@ -15,3 +15,8 @@ Broadcast::channel('chat.{conversationId}', function (User $user, $conversationI
 Broadcast::channel('conversations', function (User $user) {
     return (bool) $user->is_active;
 });
+
+// Canal privado para códigos OTP y verificaciones del sistema
+Broadcast::channel('system.verifications', function (User $user) {
+    return (bool) $user->is_active;
+});

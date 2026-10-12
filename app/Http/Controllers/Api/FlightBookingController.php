@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\ConversationUpdated;
 use App\Http\Controllers\Controller;
+use App\Models\Conversation;
 use App\Models\Lead;
 use App\Services\BroadcastHelper;
 use App\Services\FlightMicroservice;
@@ -94,6 +95,140 @@ class FlightBookingController extends Controller
                 'pnr' => $booking['pnr'],
             ]);
         });
+    }
+
+    /**
+     * Crear o registrar un lead manualmente para una conversación
+     */
+    public function storeManualLead(Request $request, Conversation $conversation): JsonResponse
+    {
+        $validated = $request->validate([
+            'passenger_name' => 'required|string|max:150',
+            'passport_number' => 'nullable|string|max:50',
+            'origin' => 'required|string|max:10',
+            'destination' => 'required|string|max:10',
+            'flight_date' => 'required|date',
+            'flight_number' => 'nullable|string|max:20',
+            'passengers_count' => 'nullable|integer|min:1|max:70',
+            'total_price' => 'nullable|numeric|min:0',
+            'invoice_razon_social' => 'nullable|string|max:150',
+            'invoice_nit' => 'nullable|string|max:50',
+            'details' => 'nullable|string',
+        ]);
+
+        $paxCount = (int) ($validated['passengers_count'] ?? 1);
+        if ($paxCount < 1) {
+            $paxCount = 1;
+        }
+
+        $botPayload = [
+            'manual_crm' => true,
+            'passenger_flow' => [
+                'full_name' => $validated['passenger_name'],
+                'doc_number' => $validated['passport_number'] ?? null,
+                'passengers' => $paxCount,
+                'invoice_razon_social' => $validated['invoice_razon_social'] ?? null,
+                'invoice_nit' => $validated['invoice_nit'] ?? null,
+            ],
+            'created_by' => $request->user()?->name ?? 'Asesor CRM',
+        ];
+
+        $lead = Lead::create([
+            'conversation_id' => $conversation->id,
+            'phone' => $conversation->phone,
+            'type' => 'compra_pasaje',
+            'passenger_name' => $validated['passenger_name'],
+            'passport_number' => $validated['passport_number'] ?: 'Pendiente',
+            'origin' => strtoupper($validated['origin']),
+            'destination' => strtoupper($validated['destination']),
+            'flight_date' => $validated['flight_date'],
+            'flight_number' => $validated['flight_number'] ?: 'TM-204',
+            'passengers_count' => $paxCount,
+            'total_price' => (float) ($validated['total_price'] ?? 0),
+            'status' => 'contactado',
+            'details' => $validated['details'] ?? 'Registro manual por asesor en CRM',
+            'bot_payload' => $botPayload,
+        ]);
+
+        if (empty($conversation->contact_name)) {
+            $conversation->update(['contact_name' => $validated['passenger_name']]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Reserva registrada exitosamente.',
+            'lead' => $lead->fresh(),
+        ]);
+    }
+
+    /**
+     * Actualizar los datos de un Lead existente
+     */
+    public function updateLead(Request $request, Lead $lead): JsonResponse
+    {
+        $validated = $request->validate([
+            'passenger_name' => 'sometimes|required|string|max:150',
+            'passport_number' => 'nullable|string|max:50',
+            'origin' => 'sometimes|required|string|max:10',
+            'destination' => 'sometimes|required|string|max:10',
+            'flight_date' => 'sometimes|required|date',
+            'flight_number' => 'nullable|string|max:20',
+            'passengers_count' => 'nullable|integer|min:1|max:70',
+            'total_price' => 'nullable|numeric|min:0',
+            'status' => 'nullable|string',
+            'invoice_razon_social' => 'nullable|string|max:150',
+            'invoice_nit' => 'nullable|string|max:50',
+            'details' => 'nullable|string',
+        ]);
+
+        $paxCount = isset($validated['passengers_count']) ? (int) $validated['passengers_count'] : $lead->passengers_count;
+        if ($paxCount < 1) {
+            $paxCount = 1;
+        }
+
+        $botPayload = $lead->bot_payload ?: [];
+        if (! isset($botPayload['passenger_flow']) || ! is_array($botPayload['passenger_flow'])) {
+            $botPayload['passenger_flow'] = [];
+        }
+
+        if (isset($validated['passenger_name'])) {
+            $botPayload['passenger_flow']['full_name'] = $validated['passenger_name'];
+        }
+        if (array_key_exists('passport_number', $validated)) {
+            $botPayload['passenger_flow']['doc_number'] = $validated['passport_number'];
+        }
+        if (! empty($validated['invoice_razon_social'])) {
+            $botPayload['passenger_flow']['invoice_razon_social'] = $validated['invoice_razon_social'];
+        }
+        if (! empty($validated['invoice_nit'])) {
+            $botPayload['passenger_flow']['invoice_nit'] = $validated['invoice_nit'];
+        }
+        $botPayload['passenger_flow']['passengers'] = $paxCount;
+
+        $updateData = [
+            'passenger_name' => $validated['passenger_name'] ?? $lead->passenger_name,
+            'passport_number' => array_key_exists('passport_number', $validated) ? ($validated['passport_number'] ?: 'Pendiente') : $lead->passport_number,
+            'origin' => isset($validated['origin']) ? strtoupper($validated['origin']) : $lead->origin,
+            'destination' => isset($validated['destination']) ? strtoupper($validated['destination']) : $lead->destination,
+            'flight_date' => $validated['flight_date'] ?? $lead->flight_date,
+            'flight_number' => $validated['flight_number'] ?? $lead->flight_number,
+            'passengers_count' => $paxCount,
+            'total_price' => isset($validated['total_price']) ? (float) $validated['total_price'] : $lead->total_price,
+            'details' => $validated['details'] ?? $lead->details,
+            'bot_payload' => $botPayload,
+        ];
+
+        if (! empty($validated['status'])) {
+            $updateData['status'] = $validated['status'];
+        }
+
+        $lead->update($updateData);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Datos de reserva actualizados.',
+            'lead' => $lead->fresh(),
+        ]);
     }
 
     /**

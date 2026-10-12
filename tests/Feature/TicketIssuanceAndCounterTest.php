@@ -101,15 +101,17 @@ class TicketIssuanceAndCounterTest extends TestCase
 
         $this->assertEquals($initialTotalTickets + 2, $metricsAfter['kpis']['total_tickets']);
         $this->assertEquals($initialTicketsToday + 2, $metricsAfter['kpis']['tickets_today']);
-        $this->assertEquals($initialEmitidosCount + 2, $metricsAfter['counts']['emitido']);
+        $this->assertEquals($initialEmitidosCount + 1, $metricsAfter['counts']['emitido']);
+        $this->assertEquals($initialEmitidosCount + 2, $metricsAfter['counts']['emitido_pax']);
 
-        // 5. Verificar que la pestaña de tickets también cuenta los 2 boletos emitidos
+        // 5. Verificar que la pestaña de tickets también cuenta los boletos emitidos
         $ticketsListRes = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/admin/tickets?status=emitido')
             ->assertStatus(200)
             ->json();
 
-        $this->assertEquals($initialEmitidosCount + 2, $ticketsListRes['counts']['emitido']);
+        $this->assertEquals($initialEmitidosCount + 1, $ticketsListRes['counts']['emitido']);
+        $this->assertEquals($initialEmitidosCount + 2, $ticketsListRes['counts']['emitido_pax']);
         $this->assertTrue(collect($ticketsListRes['tickets']['data'])->contains('id', $lead->id));
     }
 

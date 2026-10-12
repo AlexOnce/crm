@@ -1471,40 +1471,74 @@ class ChatbotEngineService
             $confirmMsg = "📋 *¡NÓMINA DE PASAJEROS REGISTRADA CON ÉXITO!*\n\n".
                 "Hemos recibido los datos de los *{$passengers} pasajeros* para el vuelo *{$vueloCode}*:\n\n".
                 $rosterText."\n".
-                "Un asesor de TAMep está revisando tu reserva y la documentación para emitir tus boletos. ¡En unos instantes se comunicará contigo! ✈️🎫";
+                'Un asesor de TAMep está revisando tu reserva y la documentación para emitir tus boletos. ¡En unos instantes se comunicará contigo! ✈️🎫';
 
             $this->reply($conv, $confirmMsg);
 
             return;
         }
 
-        // Si faltan acompañantes por registrar (ej: formulario con 0 acompañantes pero compra para N > 1):
+        // Si faltan acompañantes por registrar (ej: se solicitaron 5 boletos pero solo se llenaron 3 en el Flow):
         if ($passengers > 1) {
-            $alreadyCount = count($formCompanions);
+            $registeredPax = 1 + count($formCompanions);
+            $pendingPax = max(0, $passengers - $registeredPax);
             $session['companions'] = $formCompanions;
-            $session['current_companion_index'] = $alreadyCount + 1;
 
+            // Actualizar Lead con nota visible de pasajeros pendientes
+            $lead = Lead::where('conversation_id', $conv->id)->latest('id')->first();
+            if ($lead) {
+                $updatedDetails = $lead->details." | ⚠️ {$pendingPax} pasajero(s) pendientes por registrar";
+                $lead->update([
+                    'details' => $updatedDetails,
+                    'bot_payload' => $session,
+                ]);
+            }
+
+            // Transferir inmediatamente a asesor humano para evitar bucles sin salida
             $conv->update([
                 'session_data' => $session,
                 'contact_name' => $fullName,
-                'status' => 'bot_active',
-                'current_state' => 'COLLECTING_COMPANIONS',
+                'status' => 'waiting_agent',
+                'current_state' => 'AGENT_HANDOFF',
             ]);
 
-            BroadcastHelper::safeBroadcast(new ConversationUpdated($conv, 'collecting_companions'));
+            BroadcastHelper::safeBroadcast(new ConversationUpdated($conv, 'waiting_agent'));
+
+            try {
+                $flightDesc = $flightNumber ? "({$flightNumber})" : '(Por definir)';
+                app(WebPushService::class)->notifyWaitingPassenger(
+                    $conv,
+                    "Registro parcial ({$registeredPax} de {$passengers} PAX, {$pendingPax} pendientes): {$fullName} {$flightDesc}"
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[WebPush] Error al enviar push de registro parcial: '.$e->getMessage());
+            }
 
             $vueloCode = (! empty($flightNumber) && $flightNumber !== 'Por definir') ? $flightNumber : 'seleccionado';
-            $nextIdx = $alreadyCount + 1;
-            $nextPaxNum = $nextIdx + 1;
-            $compPrompt = "✅ *¡Datos del titular registrados con éxito!*\n\n".
-                "👥 Has solicitado boletos para *{$passengers} pasajeros* en el vuelo *{$vueloCode}*.\n".
-                "El Pasajero 1 (Titular) es *{$fullName}*.\n\n".
-                "Para completar la nómina de emisión, por favor escribe los datos de tus *{$neededComps} acompañante(s)*.\n\n".
-                "👤 *Acompañante {$nextIdx} de {$neededComps} (Pasajero {$nextPaxNum}/{$passengers}):*\n".
-                "Escribe su *Nombre completo* y su *N° de Documento / CI*:\n".
-                "_(Ejemplo: Juan Pérez Gómez - 7891234 LP)_";
+            $rosterText = "1️⃣ *{$fullName}* (Titular) - {$docType} {$fullDoc}\n";
+            foreach ($formCompanions as $cIdx => $comp) {
+                $pNum = $cIdx + 2;
+                $rosterText .= "{$pNum}️⃣ *{$comp['name']}* - Doc: {$comp['doc']}\n";
+            }
 
-            $this->reply($conv, $compPrompt);
+            $confirmMsg = BotMessage::getText(
+                'registro_pasajeros_parcial',
+                "📋 *¡DATOS REGISTRADOS CORRECTAMENTE!*\n\n".
+                "Has solicitado boletos para *{total} pasajeros* en el vuelo *{vuelo}*.\n\n".
+                "✅ *{registrados} Registrado(s):*\n".
+                "{nomina}\n\n".
+                "⏳ *Pendientes:* {pendientes} pasajero(s) por completar.\n\n".
+                'Un asesor de TAMep te atenderá en unos instantes para ayudarte a completar los datos pendientes y emitir tus boletos. ¡Agradecemos tu paciencia! ✈️🎫',
+                [
+                    'total' => (string) $passengers,
+                    'registrados' => (string) $registeredPax,
+                    'pendientes' => (string) $pendingPax,
+                    'vuelo' => $vueloCode,
+                    'nomina' => trim($rosterText),
+                ]
+            );
+
+            $this->reply($conv, $confirmMsg);
 
             return;
         }
@@ -1545,7 +1579,6 @@ class ChatbotEngineService
         );
         $this->reply($conv, $confirmMsg);
     }
-
 
     /**
      * Recopila interactivamente los datos de los acompañantes en compras múltiples (PAX > 1)
@@ -1608,7 +1641,7 @@ class ChatbotEngineService
             $msg = "✅ *Acompañante {$currentCount} registrado:* {$prevName} ({$prevDoc})\n\n".
                    "👤 *Acompañante {$nextIdx} de {$needed} (Pasajero {$nextPaxNum}/{$passengers}):*\n".
                    "Por favor escribe su *Nombre completo* y su *N° de Documento / CI*:\n".
-                   "_(Ejemplo: Maria Lopez Soto - 6543210 CB)_";
+                   '_(Ejemplo: Maria Lopez Soto - 6543210 CB)_';
             $this->reply($conv, $msg);
 
             return;
@@ -1664,7 +1697,7 @@ class ChatbotEngineService
         $confirmMsg = "📋 *¡NÓMINA DE PASAJEROS REGISTRADA CON ÉXITO!*\n\n".
                       "Hemos registrado a los *{$passengers} pasajeros* para el vuelo *{$flightNumber}*:\n\n".
                       $rosterListText."\n".
-                      "Un asesor de TAMep está revisando tu reserva y la documentación para emitir tus boletos. ¡En unos instantes se comunicará contigo! ✈️🎫";
+                      'Un asesor de TAMep está revisando tu reserva y la documentación para emitir tus boletos. ¡En unos instantes se comunicará contigo! ✈️🎫';
 
         $this->reply($conv, $confirmMsg);
     }
@@ -1680,7 +1713,7 @@ class ChatbotEngineService
             "🏢 Para oficinas y horarios escribe *OFICINAS* o el número *3*\n\n".
             "🔄 ¿NECESITAS CAMBIAR TU VUELO?\n".
             "Solicita el cambio de vuelo o cambio de ruta mediante nuestros canales oficiales de WhatsApp:\n".
-            "📱 73748234 (https://wa.me/59173748234) | 57075796 (https://wa.me/59157075796)";
+            '📱 73748234 (https://wa.me/59173748234) | 57075796 (https://wa.me/59157075796)';
 
         if (! empty($searchFlowId)) {
             $text = BotMessage::getText('menu_principal_flow', $defaultMenuFlow);
@@ -1709,7 +1742,7 @@ class ChatbotEngineService
             "🔄 ¿NECESITAS CAMBIAR TU VUELO?\n".
             "Solicita el cambio de vuelo o cambio de ruta mediante nuestros canales oficiales de WhatsApp:\n".
             "📱 73748234 (https://wa.me/59173748234) | 57075796 (https://wa.me/59157075796)\n\n".
-            "_Presiona uno de los botones abajo o escribe el número (1-3):_";
+            '_Presiona uno de los botones abajo o escribe el número (1-3):_';
 
         $text = BotMessage::getText('menu_principal_text', $defaultMenuText);
 
@@ -1738,7 +1771,7 @@ class ChatbotEngineService
                "Solicita el cambio de vuelo o cambio de ruta mediante nuestros canales oficiales de WhatsApp:\n".
                "📱 73748234 (https://wa.me/59173748234) | 57075796 (https://wa.me/59157075796)\n\n".
                "TAMEP\n".
-               "Tu viaje comienza aquí. ✈️";
+               'Tu viaje comienza aquí. ✈️';
 
         $buttons = [
             ['id' => 'menu_rutas', 'title' => '👉 Buscar Vuelos'],

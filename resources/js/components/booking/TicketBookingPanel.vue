@@ -1,31 +1,37 @@
 <template>
-  <aside class="w-full lg:w-96 h-full flex flex-col border-l border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/90 backdrop-blur-xl overflow-y-auto select-none relative transition-colors duration-200 text-slate-900 dark:text-slate-100">
+  <aside class="w-full lg:w-[320px] xl:w-[350px] 2xl:w-[370px] h-full flex flex-col border-l border-slate-800 dark:border-slate-700/80 bg-slate-900 text-slate-100 dark:bg-slate-800/95 dark:text-slate-100 backdrop-blur-xl overflow-y-auto select-none relative transition-colors duration-200 shadow-xl">
     
-    <!-- Header Minimalista y Limpio -->
-    <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 sticky top-0 z-10 backdrop-blur-md flex items-center justify-between">
+    <!-- Header con contraste invertido: Oscuro en tema claro, iluminado en tema oscuro -->
+    <div class="px-4 py-3.5 border-b border-slate-800 dark:border-slate-700/80 bg-slate-950/95 dark:bg-slate-800/95 sticky top-0 z-10 backdrop-blur-md flex items-center justify-between">
       <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-          <ClipboardList class="w-4 h-4" />
+        <div class="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/30">
+          <ClipboardList class="w-4.5 h-4.5" />
         </div>
         <div class="flex items-center gap-2">
-          <h3 class="font-bold text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
+          <h3 class="font-bold text-sm uppercase tracking-wider text-white">
             Resumen Reserva
           </h3>
           <span 
-            v-if="leadStatus === 'comprado' || leadStatus === 'emitido'"
-            class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+            v-if="isManualMode"
+            class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
+          >
+            MANUAL
+          </span>
+          <span 
+            v-else-if="leadStatus === 'comprado' || leadStatus === 'emitido'"
+            class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
           >
             VENDIDO
           </span>
           <span 
             v-else-if="leadStatus === 'contactado' || leadStatus === 'en_proceso' || chatStore.activeConversation?.assigned_user_id || chatStore.activeConversation?.status === 'human_live'"
-            class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-400 border border-sky-500/30"
+            class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40"
           >
             EN PROCESO
           </span>
           <span 
             v-else
-            class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+            class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
           >
             PENDIENTE
           </span>
@@ -37,7 +43,7 @@
           v-if="leadsList.length > 1"
           type="button"
           @click="showHistoryModal = true"
-          class="px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+          class="px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-200 transition-colors cursor-pointer border border-slate-700 dark:border-slate-600"
           title="Ver historial de formularios de este chat"
         >
           Historial ({{ leadsList.length }})
@@ -46,10 +52,10 @@
         <button 
           v-if="isMobile"
           @click="$emit('close')"
-          class="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors cursor-pointer"
           title="Cerrar panel"
         >
-          <X class="w-4 h-4" />
+          <X class="w-4.5 h-4.5" />
         </button>
       </div>
     </div>
@@ -57,46 +63,246 @@
     <!-- Banner sutil si se visualiza solicitud anterior -->
     <div 
       v-if="selectedLeadIndex > 0" 
-      class="px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-900 dark:text-amber-200 flex items-center justify-between text-[11px] font-medium"
+      class="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-900 dark:text-amber-200 flex items-center justify-between text-xs font-medium"
     >
       <span>Viendo solicitud #{{ leadsList.length - selectedLeadIndex }} (anterior)</span>
       <button 
         type="button"
         @click="selectLatestLead"
-        class="underline font-bold text-[10px] cursor-pointer hover:text-amber-950 dark:hover:text-amber-100"
+        class="underline font-bold text-xs cursor-pointer hover:text-amber-950 dark:hover:text-amber-100"
       >
         Volver a actual
       </button>
     </div>
 
     <!-- Contenido del Panel -->
-    <div class="p-3.5 sm:p-4 flex-1 space-y-3 text-xs">
+    <div class="p-3.5 sm:p-4.5 flex-1 space-y-3.5 text-sm">
       
       <!-- Si no hay conversación seleccionada -->
       <div v-if="!chatStore.activeConversation" class="text-center py-16 px-4 space-y-2.5">
-        <div class="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
-          <ClipboardList class="w-5 h-5 text-slate-500" />
+        <div class="w-11 h-11 rounded-xl bg-slate-800 dark:bg-slate-700/80 flex items-center justify-center mx-auto text-slate-400 border border-slate-700/60 dark:border-slate-600/60">
+          <ClipboardList class="w-5.5 h-5.5 text-slate-400" />
         </div>
-        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">Sin conversación seleccionada</h4>
-        <p class="text-[11px] text-slate-500 leading-relaxed max-w-xs mx-auto">
+        <h4 class="text-sm font-bold text-slate-200 dark:text-white">Sin conversación seleccionada</h4>
+        <p class="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
           Selecciona un chat de la bandeja izquierda para ver los datos de vuelo y pasajeros.
         </p>
       </div>
 
-      <!-- Si no hay Lead en esta conversación -->
-      <div v-else-if="!currentLead" class="text-center py-12 px-4 space-y-2.5">
-        <div class="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
-          <FileText class="w-5 h-5 text-slate-500" />
+      <!-- MODO DE REGISTRO / EDICIÓN MANUAL -->
+      <div v-else-if="isManualMode" class="space-y-3 animate-in fade-in duration-150">
+        
+        <div class="p-3 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <Edit3 class="w-4 h-4 text-sky-400 shrink-0" />
+            <div>
+              <h4 class="text-xs font-bold text-white">
+                {{ currentLead ? 'Editar Datos de Reserva' : 'Nuevo Registro Manual' }}
+              </h4>
+              <p class="text-[11px] text-slate-300 dark:text-slate-400 leading-tight">
+                {{ currentLead ? 'Modifica los campos del boleto' : 'Completa los datos para habilitar la reserva' }}
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            @click="cancelManualMode"
+            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Cancelar edición"
+          >
+            <X class="w-4 h-4" />
+          </button>
         </div>
-        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">Sin datos de reserva</h4>
-        <p class="text-[11px] text-slate-500 leading-relaxed max-w-xs mx-auto">
+
+        <form @submit.prevent="handleSaveManualLead" class="space-y-2.5">
+          
+          <!-- Bloque Ruta y Vuelo -->
+          <div class="p-3 sm:p-3.5 rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ruta & Vuelo</span>
+              <button 
+                type="button" 
+                @click="swapRoute" 
+                class="text-[10px] text-sky-400 hover:underline flex items-center gap-1 cursor-pointer font-bold"
+                title="Invertir origen y destino"
+              >
+                <span>Invertir Ruta ⇄</span>
+              </button>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-300 block mb-1">Origen</label>
+                <select 
+                  v-model="form.origin"
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                >
+                  <option v-for="ap in airportsList" :key="ap.code" :value="ap.code">
+                    {{ ap.code }} - {{ ap.city }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-[11px] font-semibold text-slate-300 block mb-1">Destino</label>
+                <select 
+                  v-model="form.destination"
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                >
+                  <option v-for="ap in airportsList" :key="ap.code" :value="ap.code">
+                    {{ ap.code }} - {{ ap.city }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-300 block mb-1">Fecha de Vuelo</label>
+                <input 
+                  type="date"
+                  v-model="form.flight_date"
+                  required
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label class="text-[11px] font-semibold text-slate-300 block mb-1">N° de Vuelo</label>
+                <input 
+                  type="text"
+                  v-model="form.flight_number"
+                  placeholder="TM-204"
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Bloque Pasajeros y Tarifa -->
+          <div class="p-3 sm:p-3.5 rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pasajeros & Tarifa</span>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-300 block mb-1">N° Pasajeros</label>
+                <select 
+                  v-model.number="form.passengers_count"
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                >
+                  <option v-for="n in 10" :key="n" :value="n">
+                    {{ n }} {{ n === 1 ? 'Pasajero' : 'Pasajeros' }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-[11px] font-semibold text-slate-300 block mb-1">Tarifa Total (BOB)</label>
+                <input 
+                  type="number"
+                  v-model.number="form.total_price"
+                  step="0.01"
+                  min="0"
+                  placeholder="450"
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-mono font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Bloque Pasajero Titular -->
+          <div class="p-3 sm:p-3.5 rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 space-y-2.5">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pasajero Titular</span>
+
+            <div>
+              <label class="text-[11px] font-semibold text-slate-300 block mb-1">Nombre Completo *</label>
+              <input 
+                type="text"
+                v-model="form.passenger_name"
+                required
+                placeholder="Ej. Juan Pérez Morales"
+                class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2.5 py-1.5 text-xs font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label class="text-[11px] font-semibold text-slate-300 block mb-1">Documento / CI / Pasaporte</label>
+              <input 
+                type="text"
+                v-model="form.passport_number"
+                placeholder="Ej. 6842109 SC o Pasaporte"
+                class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <!-- Bloque Facturación (Opcional) -->
+          <div class="p-3 sm:p-3.5 rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 space-y-2">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Facturación (Opcional)</span>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] font-semibold text-slate-400 block mb-0.5">Razón Social</label>
+                <input 
+                  type="text"
+                  v-model="form.invoice_razon_social"
+                  placeholder="Empresa o Nombre"
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label class="text-[10px] font-semibold text-slate-400 block mb-0.5">NIT / CI Factura</label>
+                <input 
+                  type="text"
+                  v-model="form.invoice_nit"
+                  placeholder="12345678"
+                  class="w-full bg-slate-900 dark:bg-slate-800 border border-slate-700 dark:border-slate-600 text-white rounded-lg px-2 py-1.5 text-xs font-mono font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Botones de Acción -->
+          <div class="pt-1 flex items-center gap-2">
+            <button 
+              type="submit"
+              :disabled="isSavingLead"
+              class="flex-1 py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-[0.98] text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Loader2 v-if="isSavingLead" class="w-4 h-4 animate-spin" />
+              <CheckCircle2 v-else class="w-4 h-4" />
+              <span>{{ isSavingLead ? 'Guardando...' : (currentLead ? 'Guardar Cambios' : 'Guardar Reserva') }}</span>
+            </button>
+
+            <button 
+              type="button"
+              @click="cancelManualMode"
+              class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition-colors cursor-pointer border border-slate-700"
+            >
+              Cancelar
+            </button>
+          </div>
+
+        </form>
+
+      </div>
+
+      <!-- Si no hay Lead en esta conversación y no está en modo manual -->
+      <div v-else-if="!currentLead" class="text-center py-12 px-4 space-y-2.5">
+        <div class="w-11 h-11 rounded-xl bg-slate-800 dark:bg-slate-700/80 flex items-center justify-center mx-auto text-slate-400 border border-slate-700/60 dark:border-slate-600/60">
+          <FileText class="w-5.5 h-5.5 text-slate-400" />
+        </div>
+        <h4 class="text-sm font-bold text-slate-200 dark:text-white">Sin datos de reserva</h4>
+        <p class="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
           Esta conversación aún no tiene datos de vuelo recopilados por el bot.
         </p>
         <button 
           @click="initManualLead"
-          class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+          class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs inline-flex items-center gap-1.5 mx-auto"
         >
-          + Registro Manual
+          <Edit3 class="w-3.5 h-3.5" />
+          <span>+ Registro Manual</span>
         </button>
       </div>
 
@@ -106,54 +312,63 @@
         <!-- Indicador de Venta Realizada (si ya fue emitido) -->
         <div 
           v-if="leadStatus === 'comprado' || leadStatus === 'emitido'"
-          class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs"
+          class="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-between text-xs"
         >
-          <div class="flex items-center gap-2">
-            <CheckCircle2 class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <div class="flex items-center gap-2.5">
+            <CheckCircle2 class="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
-              <span class="font-bold text-emerald-950 dark:text-emerald-200 block text-[11px]">Boleto Emitido</span>
-              <span class="font-mono text-[10px] text-emerald-800 dark:text-emerald-300">
+              <span class="font-bold text-white block text-xs">Boleto Emitido</span>
+              <span class="font-mono text-xs text-emerald-300">
                 PNR: {{ currentLead?.booking_reference || chatStore.lastIssuedTicket?.pnr || 'Emitido' }}
               </span>
             </div>
           </div>
           <button 
             @click="toggleStatus('nuevo')"
-            class="text-[10px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline cursor-pointer"
+            class="text-xs text-slate-400 hover:text-white underline cursor-pointer font-medium"
           >
             Revertir
           </button>
         </div>
 
         <!-- ========================================================
-             BLOQUE 1: RESUMEN DE VUELO Y TARIFA (UNA SOLA TIRA COMPACTA)
+             BLOQUE 1: RESUMEN DE VUELO Y TARIFA
              ======================================================== -->
-        <div class="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2">
+        <div class="p-3.5 sm:p-4 rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 shadow-sm space-y-2.5">
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="font-black text-sm text-slate-900 dark:text-white font-mono tracking-tight">{{ form.origin }} ➔ {{ form.destination }}</span>
-              <span class="text-slate-300 dark:text-slate-700">•</span>
-              <span class="font-medium text-slate-600 dark:text-slate-400 text-xs">{{ formatFlightDate(form.flight_date) }}</span>
+            <div class="flex items-center gap-2.5">
+              <span class="font-black text-base sm:text-lg text-white font-mono tracking-wide">{{ form.origin }} ➔ {{ form.destination }}</span>
+              <span class="text-slate-500">•</span>
+              <span class="font-bold text-slate-200 dark:text-slate-100 text-sm sm:text-base">{{ formatFlightDate(form.flight_date) }}</span>
             </div>
-            <button 
-              @click="copyToClipboard(`${form.origin} a ${form.destination} - ${formatFlightDate(form.flight_date)}`, 'flight_summary')"
-              class="p-1 rounded text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors cursor-pointer"
-              title="Copiar ruta y fecha"
-            >
-              <Check v-if="copiedField === 'flight_summary'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
-            </button>
+            <div class="flex items-center gap-1">
+              <button 
+                @click="editCurrentLead"
+                class="p-2 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer"
+                title="Editar datos de reserva"
+              >
+                <Edit3 class="w-4 h-4" />
+              </button>
+              <button 
+                @click="copyToClipboard(`${form.origin} a ${form.destination} - ${formatFlightDate(form.flight_date)}`, 'flight_summary')"
+                class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer"
+                title="Copiar ruta y fecha"
+              >
+                <Check v-if="copiedField === 'flight_summary'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+                <Copy v-else class="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60 text-[11px]">
-            <div class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-              <span class="font-mono font-bold text-slate-700 dark:text-slate-300">{{ form.flight_number || 'Vuelo TM' }}</span>
-              <span>•</span>
-              <span>{{ form.passengers_count }} {{ form.passengers_count === 1 ? 'PAX' : 'PAX' }} ({{ form.passenger_category || 'Adulto' }})</span>
+          <div class="flex items-center justify-between pt-2.5 border-t border-slate-700/70 dark:border-slate-600/70 text-xs sm:text-sm">
+            <div class="flex items-center gap-2 text-slate-300 dark:text-slate-200">
+              <span class="font-mono font-bold text-white text-sm">{{ form.flight_number || 'Vuelo TM' }}</span>
+              <span class="text-slate-500">•</span>
+              <span class="font-semibold">{{ form.passengers_count }} PAX ({{ form.passenger_category || 'Adulto' }})</span>
             </div>
-            <div class="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs">
+            <div class="font-mono font-black text-emerald-400 dark:text-emerald-300 text-sm sm:text-base">
               {{ form.total_price > 0 ? `${form.total_price} BOB` : 'Por cotizar' }}
-              <span v-if="form.total_price > 0 && form.passengers_count > 1" class="text-[9px] font-normal text-slate-400">
+              <span v-if="form.total_price > 0 && form.passengers_count > 1" class="text-xs font-semibold text-slate-400 dark:text-slate-300 ml-1">
                 ({{ Math.round(form.total_price / form.passengers_count) }} c/u)
               </span>
             </div>
@@ -163,30 +378,30 @@
         <!-- ========================================================
              BLOQUE 2A: PASAJERO INDIVIDUAL (LISTA CLAVE-VALOR PLANA)
              ======================================================== -->
-        <div v-if="form.passengers_count <= 1" class="rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-700/60 shadow-2xs overflow-hidden">
+        <div v-if="form.passengers_count <= 1" class="rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 divide-y divide-slate-700/60 dark:divide-slate-600/60 shadow-sm overflow-hidden">
           
           <!-- Nombre -->
-          <div class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+          <div class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors">
             <div class="min-w-0 pr-2">
-              <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Pasajero</span>
-              <span class="font-bold text-slate-900 dark:text-white text-xs truncate block mt-0.5">{{ form.passenger_name || 'Sin especificar' }}</span>
+              <span class="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 block tracking-wider">Pasajero</span>
+              <span class="font-bold text-white text-sm sm:text-base truncate block mt-0.5 leading-snug">{{ form.passenger_name || 'Sin especificar' }}</span>
             </div>
             <button 
               @click="copyToClipboard(form.passenger_name, 'name')"
-              class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+              class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer"
               title="Copiar nombre"
             >
-              <Check v-if="copiedField === 'name'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
+              <Check v-if="copiedField === 'name'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-4 h-4" />
             </button>
           </div>
 
           <!-- Documento y Pasaporte -->
-          <div class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+          <div class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors">
             <div class="min-w-0 pr-2">
-              <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Documento / Pasaporte</span>
-              <div class="flex items-center gap-1.5 font-mono text-xs mt-0.5">
-                <span class="font-bold text-slate-900 dark:text-white">{{ form.passport_number || 'Pendiente' }}</span>
+              <span class="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 block tracking-wider">Documento / Pasaporte</span>
+              <div class="flex items-center gap-2 font-mono text-xs sm:text-sm mt-0.5">
+                <span class="font-bold text-white">{{ form.passport_number || 'Pendiente' }}</span>
                 <span v-if="customerPassport && !form.passport_number?.includes(customerPassport)" class="text-slate-400">
                   | PAS: {{ customerPassport }}
                 </span>
@@ -194,95 +409,100 @@
             </div>
             <button 
               @click="copyToClipboard(customerPassport || form.passport_number, 'doc')"
-              class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+              class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer"
               title="Copiar documento"
             >
-              <Check v-if="copiedField === 'doc'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
+              <Check v-if="copiedField === 'doc'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-4 h-4" />
             </button>
           </div>
 
           <!-- Género y Fecha de Nacimiento -->
-          <div v-if="customerGender || customerBirthDate" class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+          <div v-if="customerGender || customerBirthDate" class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors">
             <div class="min-w-0 pr-2">
-              <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Género & Nacimiento</span>
-              <div class="flex items-center gap-2 text-xs mt-0.5">
-                <span v-if="customerGender" class="font-medium text-slate-800 dark:text-slate-200">{{ customerGender }}</span>
-                <span v-if="customerGender && customerBirthDate" class="text-slate-300 dark:text-slate-700">•</span>
-                <span v-if="customerBirthDate" class="font-mono text-slate-600 dark:text-slate-400">{{ customerBirthDate }}</span>
+              <span class="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 block tracking-wider">Género & Nacimiento</span>
+              <div class="flex items-center gap-2 text-xs sm:text-sm mt-0.5">
+                <span v-if="customerGender" class="font-semibold text-slate-200">{{ customerGender }}</span>
+                <span v-if="customerGender && customerBirthDate" class="text-slate-500">•</span>
+                <span v-if="customerBirthDate" class="font-mono text-slate-300 font-medium">{{ customerBirthDate }}</span>
               </div>
             </div>
             <button 
               @click="copyToClipboard(`${customerGender || ''} ${customerBirthDate ? `Nac: ${customerBirthDate}` : ''}`.trim(), 'gen_bd')"
-              class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+              class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer"
               title="Copiar género y fecha"
             >
-              <Check v-if="copiedField === 'gen_bd'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
+              <Check v-if="copiedField === 'gen_bd'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-4 h-4" />
             </button>
           </div>
 
           <!-- Contacto (Teléfono y Email) -->
-          <div class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+          <div class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors">
             <div class="min-w-0 pr-2">
-              <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Contacto</span>
-              <div class="flex items-center gap-2 text-xs mt-0.5 truncate">
-                <span class="font-mono font-bold text-slate-800 dark:text-slate-200">+{{ chatStore.activeConversation?.phone }}</span>
-                <span v-if="customerEmail" class="text-slate-300 dark:text-slate-700">•</span>
-                <span v-if="customerEmail" class="text-slate-600 dark:text-slate-400 truncate">{{ customerEmail }}</span>
+              <span class="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 block tracking-wider">Contacto</span>
+              <div class="flex items-center flex-wrap gap-2 text-xs sm:text-sm mt-0.5">
+                <span class="font-mono font-bold text-white">+{{ chatStore.activeConversation?.phone }}</span>
+                <span v-if="customerEmail" class="text-slate-500">•</span>
+                <span v-if="customerEmail" class="text-slate-300 truncate">{{ customerEmail }}</span>
               </div>
             </div>
             <button 
               @click="copyToClipboard(chatStore.activeConversation?.phone, 'phone')"
-              class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+              class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer"
               title="Copiar teléfono"
             >
-              <Check v-if="copiedField === 'phone'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
+              <Check v-if="copiedField === 'phone'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-4 h-4" />
             </button>
           </div>
 
         </div>
 
         <!-- ========================================================
-             BLOQUE 2B: NÓMINA GRUPAL (PAX > 1)
+             BLOQUE 2B: NÓMINA GRUPAL (PAX > 1) - ALTA VISIBILIDAD
              ======================================================== -->
-        <div v-else class="rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-          <div class="px-3 py-2 bg-slate-50/70 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
-            <span class="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+        <div v-else class="rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 shadow-sm overflow-hidden">
+          <div class="px-3.5 py-2.5 bg-slate-900/60 dark:bg-slate-800/60 border-b border-slate-700/70 dark:border-slate-600/70 flex items-center justify-between">
+            <span class="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 dark:text-white">
               Nómina ({{ form.passengers_count }} PAX)
             </span>
             <button 
               type="button"
               @click="copyAllPassengers"
-              class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-600 hover:bg-sky-500 text-white transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
+              class="px-3 py-1 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs"
             >
-              <Check v-if="copiedField === 'all_pax'" class="w-3 h-3 text-white stroke-[3]" />
-              <Copy v-else class="w-3 h-3 text-white" />
+              <Check v-if="copiedField === 'all_pax'" class="w-3.5 h-3.5 text-white stroke-[3]" />
+              <Copy v-else class="w-3.5 h-3.5 text-white" />
               <span>{{ copiedField === 'all_pax' ? 'Copiada' : 'Copiar Nómina' }}</span>
             </button>
           </div>
 
-          <div class="divide-y divide-slate-100 dark:divide-slate-700/60 max-h-56 overflow-y-auto">
+          <!-- LISTA DE PASAJEROS: Espacio amplio, sin cortes comprimidos -->
+          <div class="divide-y divide-slate-700/60 dark:divide-slate-600/60 max-h-[480px] overflow-y-auto">
             <!-- 1. Titular -->
-            <div class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+            <div class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors">
               <div class="min-w-0 pr-2">
-                <div class="flex items-center gap-1 text-[10px] text-slate-500">
-                  <span class="font-bold text-sky-600 dark:text-sky-400">1. TITULAR</span>
-                  <span v-if="customerGender" class="font-semibold text-slate-400">({{ customerGender }})</span>
+                <div class="flex items-center gap-1.5 text-xs">
+                  <span class="font-extrabold text-sky-400 dark:text-sky-300">1. TITULAR</span>
+                  <span v-if="customerGender" class="font-medium text-slate-400 dark:text-slate-300">({{ customerGender }})</span>
                 </div>
-                <div class="font-bold text-slate-900 dark:text-white text-xs truncate">{{ form.passenger_name }}</div>
-                <div class="text-[10px] text-slate-500 font-mono">
-                  {{ form.passport_number }} <span v-if="customerBirthDate">• Nac: {{ customerBirthDate }}</span>
+                <div class="font-bold text-white text-sm sm:text-base truncate mt-0.5 leading-snug">
+                  {{ form.passenger_name }}
+                </div>
+                <div class="text-xs sm:text-sm text-slate-300 dark:text-slate-200 font-mono font-medium mt-0.5 flex items-center flex-wrap gap-1">
+                  <span>{{ form.passport_number }}</span>
+                  <span v-if="customerBirthDate" class="text-slate-500">•</span>
+                  <span v-if="customerBirthDate">Nac: {{ customerBirthDate }}</span>
                 </div>
               </div>
               <button 
                 @click="copyToClipboard(`${form.passenger_name} - ${form.passport_number}${customerGender ? ` (${customerGender})` : ''}`, 'pax_1')"
-                class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+                class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer shrink-0"
                 title="Copiar titular"
               >
-                <Check v-if="copiedField === 'pax_1'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-                <Copy v-else class="w-3.5 h-3.5" />
+                <Check v-if="copiedField === 'pax_1'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+                <Copy v-else class="w-4 h-4" />
               </button>
             </div>
 
@@ -290,55 +510,59 @@
             <div 
               v-for="(comp, cIdx) in companions" 
               :key="cIdx"
-              class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors"
+              class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors"
             >
               <div class="min-w-0 pr-2">
-                <div class="flex items-center gap-1 text-[10px] text-slate-500">
-                  <span class="font-bold text-slate-600 dark:text-slate-400">{{ cIdx + 2 }}. ACOMPAÑANTE</span>
-                  <span v-if="comp.gender" class="font-semibold text-slate-400">({{ comp.gender }})</span>
+                <div class="flex items-center gap-1.5 text-xs">
+                  <span class="font-extrabold text-slate-300 dark:text-slate-200">{{ cIdx + 2 }}. ACOMPAÑANTE</span>
+                  <span v-if="comp.gender" class="font-medium text-slate-400 dark:text-slate-300">({{ comp.gender }})</span>
                 </div>
-                <div class="font-bold text-slate-900 dark:text-white text-xs truncate">{{ comp.name }}</div>
-                <div class="text-[10px] text-slate-500 font-mono">
-                  {{ comp.doc || 'Doc: Por confirmar' }} <span v-if="comp.birth_date">• Nac: {{ formatFlightDate(comp.birth_date) }}</span>
+                <div class="font-bold text-white text-sm sm:text-base truncate mt-0.5 leading-snug">
+                  {{ comp.name }}
+                </div>
+                <div class="text-xs sm:text-sm text-slate-300 dark:text-slate-200 font-mono font-medium mt-0.5 flex items-center flex-wrap gap-1">
+                  <span>{{ comp.doc || 'Doc: Por confirmar' }}</span>
+                  <span v-if="comp.birth_date" class="text-slate-500">•</span>
+                  <span v-if="comp.birth_date">Nac: {{ formatFlightDate(comp.birth_date) }}</span>
                 </div>
               </div>
               <button 
                 @click="copyToClipboard(`${comp.name} - ${comp.doc}${comp.gender ? ` (${comp.gender})` : ''}`, `pax_${cIdx + 2}`)"
-                class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+                class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer shrink-0"
                 :title="`Copiar acompañante ${cIdx + 2}`"
               >
-                <Check v-if="copiedField === `pax_${cIdx + 2}`" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-                <Copy v-else class="w-3.5 h-3.5" />
+                <Check v-if="copiedField === `pax_${cIdx + 2}`" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+                <Copy v-else class="w-4 h-4" />
               </button>
             </div>
 
             <!-- Si faltan acompañantes -->
             <div 
               v-if="companions.length < (form.passengers_count - 1)"
-              class="p-2 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-[10px] font-medium flex items-center gap-1.5"
+              class="p-3 bg-amber-500/15 text-amber-200 text-xs font-semibold flex items-center gap-2 border-t border-amber-500/30"
             >
-              <Clock class="w-3 h-3 text-amber-600 shrink-0 animate-pulse" />
-              <span>Esperando datos de {{ (form.passengers_count - 1) - companions.length }} acompañante(s)...</span>
+              <Clock class="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+              <span>Pendiente: Faltan datos de {{ (form.passengers_count - 1) - companions.length }} acompañante(s)</span>
             </div>
           </div>
 
           <!-- Contacto compartido en compras grupales -->
-          <div class="p-2.5 bg-slate-50/50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs">
+          <div class="p-3 bg-slate-900/50 dark:bg-slate-800/50 border-t border-slate-700/70 dark:border-slate-600/70 flex items-center justify-between text-xs sm:text-sm">
             <div class="min-w-0 pr-2">
-              <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Contacto Principal</span>
-              <div class="flex items-center gap-1.5 font-mono text-[11px] truncate mt-0.5">
-                <span class="font-bold text-slate-800 dark:text-slate-200">+{{ chatStore.activeConversation?.phone }}</span>
-                <span v-if="customerEmail" class="text-slate-300 dark:text-slate-700">•</span>
-                <span v-if="customerEmail" class="text-slate-500 truncate">{{ customerEmail }}</span>
+              <span class="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 block tracking-wider">Contacto Principal</span>
+              <div class="flex items-center flex-wrap gap-2 font-mono text-sm mt-0.5">
+                <span class="font-bold text-white">+{{ chatStore.activeConversation?.phone }}</span>
+                <span v-if="customerEmail" class="text-slate-500">•</span>
+                <span v-if="customerEmail" class="text-slate-300 truncate">{{ customerEmail }}</span>
               </div>
             </div>
             <button 
               @click="copyToClipboard(chatStore.activeConversation?.phone, 'phone')"
-              class="p-1.5 rounded text-slate-400 hover:text-sky-600 transition-colors cursor-pointer"
+              class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer shrink-0"
               title="Copiar teléfono"
             >
-              <Check v-if="copiedField === 'phone'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
+              <Check v-if="copiedField === 'phone'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -347,91 +571,91 @@
              BLOQUE 3: OBSERVACIONES Y FACTURACIÓN
              ======================================================== -->
         <!-- Observaciones de Viaje (si existen) -->
-        <div v-if="customerObservation" class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start justify-between gap-2">
+        <div v-if="customerObservation" class="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-start justify-between gap-2.5">
           <div class="min-w-0">
-            <span class="text-[9px] font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider block">Observaciones</span>
-            <p class="text-xs font-semibold text-amber-950 dark:text-amber-100 mt-0.5 leading-snug">{{ customerObservation }}</p>
+            <span class="text-xs font-bold text-amber-400 uppercase tracking-wider block">Observaciones</span>
+            <p class="text-sm sm:text-base font-semibold text-amber-100 mt-1 leading-snug">{{ customerObservation }}</p>
           </div>
           <button 
             @click="copyToClipboard(customerObservation, 'observation')"
-            class="shrink-0 p-1 rounded text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
+            class="shrink-0 p-2 rounded-lg text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
             title="Copiar observaciones"
           >
-            <Check v-if="copiedField === 'observation'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-            <Copy v-else class="w-3.5 h-3.5" />
+            <Check v-if="copiedField === 'observation'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+            <Copy v-else class="w-4 h-4" />
           </button>
         </div>
 
         <!-- Facturación (Razón Social y NIT) -->
-        <div v-if="invoiceRazonSocial || invoiceNit || customerInvoice" class="rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 shadow-2xs divide-y divide-slate-100 dark:divide-slate-700/60 overflow-hidden">
-          <div class="px-3 py-2 bg-slate-50/70 dark:bg-slate-800/50 flex items-center justify-between">
-            <span class="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+        <div v-if="invoiceRazonSocial || invoiceNit || customerInvoice" class="rounded-xl bg-slate-800/95 dark:bg-slate-700/85 border border-slate-700/80 dark:border-slate-600/70 shadow-sm divide-y divide-slate-700/60 dark:divide-slate-600/60 overflow-hidden">
+          <div class="px-3.5 py-2.5 bg-slate-900/60 dark:bg-slate-800/60 flex items-center justify-between">
+            <span class="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 dark:text-white">
               Facturación
             </span>
             <button 
               @click="copyToClipboard(customerInvoice || `${invoiceRazonSocial} - ${invoiceNit}`, 'invoice')"
-              class="text-[10px] font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer flex items-center gap-1"
+              class="text-xs font-bold text-sky-400 hover:underline cursor-pointer flex items-center gap-1.5"
               title="Copiar datos completos de factura"
             >
-              <Check v-if="copiedField === 'invoice'" class="w-3 h-3 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3 h-3" />
+              <Check v-if="copiedField === 'invoice'" class="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-3.5 h-3.5" />
               <span>{{ copiedField === 'invoice' ? 'Copiada' : 'Copiar Factura' }}</span>
             </button>
           </div>
 
           <!-- Razón Social -->
-          <div v-if="invoiceRazonSocial" class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+          <div v-if="invoiceRazonSocial" class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors">
             <div class="min-w-0 pr-2">
-              <span class="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Razón Social</span>
-              <span class="font-bold text-slate-900 dark:text-white text-xs truncate block mt-0.5">{{ invoiceRazonSocial }}</span>
+              <span class="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 block tracking-wider">Razón Social</span>
+              <span class="font-bold text-white text-sm sm:text-base truncate block mt-0.5 leading-snug">{{ invoiceRazonSocial }}</span>
             </div>
             <button 
               @click="copyToClipboard(invoiceRazonSocial, 'inv_razon')"
-              class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+              class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer shrink-0"
               title="Copiar Razón Social"
             >
-              <Check v-if="copiedField === 'inv_razon'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
+              <Check v-if="copiedField === 'inv_razon'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-4 h-4" />
             </button>
           </div>
 
           <!-- NIT / Documento -->
-          <div v-if="invoiceNit" class="p-2.5 flex items-center justify-between group hover:bg-slate-50/70 dark:hover:bg-slate-800 transition-colors">
+          <div v-if="invoiceNit" class="p-3 sm:p-3.5 flex items-center justify-between group hover:bg-slate-700/50 dark:hover:bg-slate-600/50 transition-colors">
             <div class="min-w-0 pr-2">
-              <div class="flex items-center gap-1.5">
-                <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">NIT / Documento</span>
-                <span v-if="invoiceDocType" class="px-1 py-0.2 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[8px] font-bold uppercase">{{ invoiceDocType }}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs uppercase font-bold text-slate-400 dark:text-slate-300 tracking-wider">NIT / Documento</span>
+                <span v-if="invoiceDocType" class="px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 text-[10px] font-bold uppercase">{{ invoiceDocType }}</span>
               </div>
-              <span class="font-mono font-black text-slate-900 dark:text-white text-xs block mt-0.5">{{ invoiceNit }}</span>
+              <span class="font-mono font-black text-white text-base block mt-0.5">{{ invoiceNit }}</span>
             </div>
             <button 
               @click="copyToClipboard(invoiceNit, 'inv_nit')"
-              class="p-1.5 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+              class="p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-700/60 dark:hover:bg-slate-600/60 transition-colors cursor-pointer shrink-0"
               title="Copiar NIT"
             >
-              <Check v-if="copiedField === 'inv_nit'" class="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
-              <Copy v-else class="w-3.5 h-3.5" />
+              <Check v-if="copiedField === 'inv_nit'" class="w-4 h-4 text-emerald-400 stroke-[3]" />
+              <Copy v-else class="w-4 h-4" />
             </button>
           </div>
 
           <!-- Fallback si es texto libre -->
-          <div v-if="!invoiceRazonSocial && !invoiceNit && customerInvoice" class="p-2.5 text-xs text-slate-700 dark:text-slate-300">
+          <div v-if="!invoiceRazonSocial && !invoiceNit && customerInvoice" class="p-3 text-sm text-slate-200">
             {{ customerInvoice }}
           </div>
         </div>
 
         <!-- ========================================================
-             BOTÓN DE REGISTRAR VENTA DE BOLETO (MINIMALISTA)
+             BOTÓN DE REGISTRAR VENTA DE BOLETO
              ======================================================== -->
         <div class="pt-2">
           <button
             v-if="leadStatus !== 'comprado' && leadStatus !== 'emitido'"
             @click="handleIssueTicket"
             :disabled="chatStore.issuingTicket"
-            class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm sm:text-base shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <Loader2 v-if="chatStore.issuingTicket" class="w-4 h-4 animate-spin" />
-            <CheckCircle2 v-else class="w-4 h-4" />
+            <Loader2 v-if="chatStore.issuingTicket" class="w-4.5 h-4.5 animate-spin" />
+            <CheckCircle2 v-else class="w-4.5 h-4.5" />
             <span>
               {{ chatStore.issuingTicket 
                 ? 'Registrando...' 
@@ -671,7 +895,8 @@ import {
   AlertCircle,
   Sparkles,
   Users,
-  Copy
+  Copy,
+  Edit3
 } from 'lucide-vue-next';
 import Swal from 'sweetalert2';
 import { useChatStore } from '@/stores/useChatStore';
@@ -692,6 +917,20 @@ const selectedLeadIndex = computed(() => {
   if (!currentLead.value || !leadsList.value.length) return 0;
   return leadsList.value.findIndex(l => parseInt(l.id) === parseInt(currentLead.value.id));
 });
+
+const isManualMode = ref(false);
+const isSavingLead = ref(false);
+
+const airportsList = [
+  { code: 'VVI', city: 'Santa Cruz (Viru Viru)' },
+  { code: 'LPB', city: 'La Paz (El Alto)' },
+  { code: 'CBB', city: 'Cochabamba' },
+  { code: 'TJA', city: 'Tarija' },
+  { code: 'SRE', city: 'Sucre' },
+  { code: 'CIJ', city: 'Cobija' },
+  { code: 'TDD', city: 'Trinidad' },
+  { code: 'SRZ', city: 'Santa Cruz (El Trompillo)' },
+];
 
 const showHistoryModal = ref(false);
 
@@ -915,7 +1154,7 @@ const form = ref({
 watch(
   () => chatStore.activeLead,
   (lead) => {
-    if (lead) {
+    if (lead && !isManualMode.value) {
       leadStatus.value = lead.status || 'nuevo';
       const pax = parseInt(
         lead.passengers_count
@@ -990,6 +1229,7 @@ function formatFlightDate(dateVal) {
 }
 
 function initManualLead() {
+  isManualMode.value = true;
   leadStatus.value = 'nuevo';
   const session = chatStore.activeConversation?.session_data || {};
   const pax = parseInt(
@@ -1000,18 +1240,88 @@ function initManualLead() {
     || 1
   ) || 1;
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   form.value = {
     passenger_name: session.passenger_name || session.passenger_flow?.full_name || chatStore.activeConversation?.contact_name || '',
     passport_number: session.passport_number || (session.passenger_flow?.doc_number ? `${session.passenger_flow?.doc_type || 'CI'}: ${session.passenger_flow?.doc_number}` : ''),
     origin: session.origin || 'VVI',
     destination: session.destination || 'LPB',
-    flight_date: session.flight_date ? String(session.flight_date).split('T')[0] : new Date().toISOString().split('T')[0],
-    flight_number: session.selected_flight?.flight_number || 'Pendiente',
+    flight_date: session.flight_date ? String(session.flight_date).split('T')[0] : todayStr,
+    flight_number: session.selected_flight?.flight_number || 'TM-204',
     passengers_count: pax,
     passenger_category: session.passenger_category || session.passenger_flow?.passenger_category || 'Adulto (+12)',
-    total_price: session.selected_flight?.price ? parseFloat(session.selected_flight.price) : 0,
+    total_price: session.selected_flight?.price ? parseFloat(session.selected_flight.price) : 450.00,
+    invoice_razon_social: invoiceRazonSocial.value || '',
+    invoice_nit: invoiceNit.value || '',
   };
 }
+
+function editCurrentLead() {
+  isManualMode.value = true;
+  form.value = {
+    passenger_name: currentLead.value?.passenger_name || chatStore.activeConversation?.contact_name || '',
+    passport_number: currentLead.value?.passport_number || '',
+    origin: currentLead.value?.origin || 'VVI',
+    destination: currentLead.value?.destination || 'LPB',
+    flight_date: currentLead.value?.flight_date ? String(currentLead.value.flight_date).split('T')[0] : new Date().toISOString().split('T')[0],
+    flight_number: currentLead.value?.flight_number && currentLead.value?.flight_number !== 'Por definir' ? currentLead.value.flight_number : 'TM-204',
+    passengers_count: parseInt(currentLead.value?.passengers_count || 1),
+    passenger_category: form.value.passenger_category || 'Adulto (+12)',
+    total_price: currentLead.value?.total_price ? parseFloat(currentLead.value.total_price) : 0,
+    invoice_razon_social: invoiceRazonSocial.value || '',
+    invoice_nit: invoiceNit.value || '',
+  };
+}
+
+function cancelManualMode() {
+  isManualMode.value = false;
+}
+
+function swapRoute() {
+  const tmp = form.value.origin;
+  form.value.origin = form.value.destination;
+  form.value.destination = tmp;
+}
+
+async function handleSaveManualLead() {
+  if (!form.value.passenger_name || !form.value.passenger_name.trim()) {
+    showToast('Ingresa el nombre del pasajero titular', 'error');
+    return;
+  }
+  if (!form.value.origin || !form.value.destination) {
+    showToast('Selecciona la ruta de origen y destino', 'error');
+    return;
+  }
+  if (form.value.origin === form.value.destination) {
+    showToast('El origen y destino no pueden ser iguales', 'error');
+    return;
+  }
+  if (!form.value.flight_date) {
+    showToast('Ingresa la fecha de vuelo', 'error');
+    return;
+  }
+
+  isSavingLead.value = true;
+  try {
+    const res = await chatStore.saveManualLead(form.value);
+    if (res.success) {
+      isManualMode.value = false;
+      showToast('Reserva guardada exitosamente');
+    } else {
+      showToast(res.message || 'Error al guardar la reserva', 'error');
+    }
+  } finally {
+    isSavingLead.value = false;
+  }
+}
+
+watch(
+  () => chatStore.activeConversation?.id,
+  () => {
+    isManualMode.value = false;
+  }
+);
 
 function copyToClipboard(text, fieldKey) {
   if (!text) return;

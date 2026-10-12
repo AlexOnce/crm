@@ -730,34 +730,34 @@ class WhatsAppFlowIntegrationTest extends TestCase
 
     public function test_meta_webhook_handles_large_group_numeric_passengers_without_cap(): void
     {
-        $mockFlightService = $this->createMock(\App\Services\FlightMicroservice::class);
-        $mockFlightService->method('searchFlights')->willReturn([ [
-            'flight_number'    => 'TM-705',
-            'origin'           => 'LPB',
-            'origin_city'      => 'La Paz',
-            'destination'      => 'VVI',
+        $mockFlightService = $this->createMock(FlightMicroservice::class);
+        $mockFlightService->method('searchFlights')->willReturn([[
+            'flight_number' => 'TM-705',
+            'origin' => 'LPB',
+            'origin_city' => 'La Paz',
+            'destination' => 'VVI',
             'destination_city' => 'Santa Cruz',
-            'departure_time'   => '08:30',
-            'arrival_time'     => '09:35',
-            'aircraft'         => 'Avro RJ70 CP-3106',
-            'price'            => 4500.00,
-        ] ]);
-        $mockFlightService->method('getCityName')->willReturnCallback(fn($c) => $c === 'LPB' ? 'La Paz' : 'Santa Cruz');
-        $this->app->instance(\App\Services\FlightMicroservice::class, $mockFlightService);
+            'departure_time' => '08:30',
+            'arrival_time' => '09:35',
+            'aircraft' => 'Avro RJ70 CP-3106',
+            'price' => 4500.00,
+        ]]);
+        $mockFlightService->method('getCityName')->willReturnCallback(fn ($c) => $c === 'LPB' ? 'La Paz' : 'Santa Cruz');
+        $this->app->instance(FlightMicroservice::class, $mockFlightService);
 
         $conv = Conversation::create([
-            'phone'         => '59179988776',
-            'status'        => 'bot_active',
+            'phone' => '59179988776',
+            'status' => 'bot_active',
             'current_state' => 'MENU_PRINCIPAL',
         ]);
 
         $searchData = [
-            'origin'      => 'LOB',
+            'origin' => 'LOB',
             'destination' => 'VVI',
             'flight_date' => '2026-10-15',
-            'adults'      => '10',
-            'children'    => '2',
-            'babies'      => '0',
+            'adults' => '10',
+            'children' => '2',
+            'babies' => '0',
         ];
 
         $payload = [
@@ -770,30 +770,30 @@ class WhatsAppFlowIntegrationTest extends TestCase
                             'value' => [
                                 'messaging_product' => 'whatsapp',
                                 'metadata' => [
-                                     'display_phone_number' => '59157034222',
-                                     'phone_number_id' => (string) config('services.meta.phone_number_id', '1239768275896736'),
+                                    'display_phone_number' => '59157034222',
+                                    'phone_number_id' => (string) config('services.meta.phone_number_id', '1239768275896736'),
                                 ],
                                 'contacts' => [
-                                     [
-                                         'profile' => ['name' => 'Delegacion Militar'],
+                                    [
+                                        'profile' => ['name' => 'Delegacion Militar'],
                                         'wa_id' => '59179988776',
-                                     ],
+                                    ],
                                 ],
                                 'messages' => [
-                                     [
-                                         'from' => '59179988776',
-                                         'id' => 'wamid.group_pax_' . uniqid(),
-                                         'timestamp' => (string) time(),
-                                         'type' => 'interactive',
-                                         'interactive' => [
-                                             'type' => 'nfm_reply',
-                                             'nfm_reply' => [
-                                                 'response_json' => json_encode($searchData),
-                                                 'body' => 'Sent',
-                                                 'name' => 'flow',
-                                             ],
-                                         ],
-                                     ],
+                                    [
+                                        'from' => '59179988776',
+                                        'id' => 'wamid.group_pax_'.uniqid(),
+                                        'timestamp' => (string) time(),
+                                        'type' => 'interactive',
+                                        'interactive' => [
+                                            'type' => 'nfm_reply',
+                                            'nfm_reply' => [
+                                                'response_json' => json_encode($searchData),
+                                                'body' => 'Sent',
+                                                'name' => 'flow',
+                                            ],
+                                        ],
+                                    ],
                                 ],
                             ],
                         ],
@@ -984,101 +984,22 @@ class WhatsAppFlowIntegrationTest extends TestCase
         $res1->assertStatus(200);
 
         $conv->refresh();
-        // El bot debe continuar activo solicitando los datos del primer acompañante
-        $this->assertEquals('bot_active', $conv->status);
-        $this->assertEquals('COLLECTING_COMPANIONS', $conv->current_state);
+        // Al enviar menos acompañantes que los solicitados, el bot no se traba en un bucle: pasa a asesor
+        $this->assertEquals('waiting_agent', $conv->status);
+        $this->assertEquals('AGENT_HANDOFF', $conv->current_state);
 
         $botMsg1 = $conv->messages()->where('sender', 'bot')->latest('id')->first();
         $this->assertNotNull($botMsg1);
-        $this->assertStringContainsString('Acompañante 1 de 2', $botMsg1->message);
+        $this->assertStringContainsString('DATOS REGISTRADOS CORRECTAMENTE', $botMsg1->message);
+        $this->assertStringContainsString('3 pasajeros', $botMsg1->message);
+        $this->assertStringContainsString('1 Registrado(s)', $botMsg1->message);
+        $this->assertStringContainsString('2 pasajero(s) por completar', $botMsg1->message);
+        $this->assertStringContainsString('Un asesor de TAMep te atenderá', $botMsg1->message);
 
-        // 2. El cliente escribe el acompañante 1
-        $payloadComp1 = [
-            'object' => 'whatsapp_business_account',
-            'entry' => [[
-                'id' => '1393041265542970',
-                'changes' => [[
-                    'value' => [
-                        'messaging_product' => 'whatsapp',
-                        'metadata' => [
-                            'display_phone_number' => '59157034222',
-                            'phone_number_id' => (string) config('services.meta.phone_number_id', '1239768275896736'),
-                        ],
-                        'contacts' => [['profile' => ['name' => 'Roberto Vaca'], 'wa_id' => '59178899001']],
-                        'messages' => [[
-                            'from' => '59178899001',
-                            'id' => 'wamid.COMP_TEXT_1',
-                            'timestamp' => (string) time(),
-                            'type' => 'text',
-                            'text' => ['body' => 'Valeria Vaca Mercado - 8765432 SC'],
-                        ]],
-                    ],
-                    'field' => 'messages',
-                ]],
-            ]],
-        ];
-
-        $res2 = $this->postJson('/api/webhooks/whatsapp', $payloadComp1);
-        $res2->assertStatus(200);
-
-        $conv->refresh();
-        $this->assertEquals('bot_active', $conv->status);
-        $this->assertEquals('COLLECTING_COMPANIONS', $conv->current_state);
-        $this->assertCount(1, $conv->session_data['companions']);
-        $this->assertEquals('Valeria Vaca Mercado', $conv->session_data['companions'][0]['name']);
-        $this->assertEquals('8765432 SC', $conv->session_data['companions'][0]['doc']);
-
-        $botMsg2 = $conv->messages()->where('sender', 'bot')->latest('id')->first();
-        $this->assertStringContainsString('Acompañante 2 de 2', $botMsg2->message);
-
-        // 3. El cliente escribe el acompañante 2 (último acompañante)
-        $payloadComp2 = [
-            'object' => 'whatsapp_business_account',
-            'entry' => [[
-                'id' => '1393041265542970',
-                'changes' => [[
-                    'value' => [
-                        'messaging_product' => 'whatsapp',
-                        'metadata' => [
-                            'display_phone_number' => '59157034222',
-                            'phone_number_id' => (string) config('services.meta.phone_number_id', '1239768275896736'),
-                        ],
-                        'contacts' => [['profile' => ['name' => 'Roberto Vaca'], 'wa_id' => '59178899001']],
-                        'messages' => [[
-                            'from' => '59178899001',
-                            'id' => 'wamid.COMP_TEXT_2',
-                            'timestamp' => (string) time(),
-                            'type' => 'text',
-                            'text' => ['body' => 'Joaquin Vaca Mercado - 9876543 SC'],
-                        ]],
-                    ],
-                    'field' => 'messages',
-                ]],
-            ]],
-        ];
-
-        $res3 = $this->postJson('/api/webhooks/whatsapp', $payloadComp2);
-        $res3->assertStatus(200);
-
-        $conv->refresh();
-        // Nómina completa -> pasa al asesor
-        $this->assertEquals('waiting_agent', $conv->status);
-        $this->assertEquals('AGENT_HANDOFF', $conv->current_state);
-        $this->assertCount(2, $conv->session_data['companions']);
-
-        // Verificar el Lead actualizado con la nómina en details
+        // Verificar el Lead con la nota de pasajeros pendientes
         $lead = Lead::where('conversation_id', $conv->id)->first();
         $this->assertNotNull($lead);
-        $this->assertEquals(3, $lead->passengers_count);
-        $this->assertStringContainsString('Valeria Vaca Mercado', $lead->details);
-        $this->assertStringContainsString('Joaquin Vaca Mercado', $lead->details);
-
-        // Verificar mensaje final con resumen consolidado
-        $botMsg3 = $conv->messages()->where('sender', 'bot')->latest('id')->first();
-        $this->assertStringContainsString('NÓMINA DE PASAJEROS REGISTRADA CON ÉXITO', $botMsg3->message);
-        $this->assertStringContainsString('1️⃣ *Roberto Vaca Justiniano*', $botMsg3->message);
-        $this->assertStringContainsString('2️⃣ *Valeria Vaca Mercado*', $botMsg3->message);
-        $this->assertStringContainsString('3️⃣ *Joaquin Vaca Mercado*', $botMsg3->message);
+        $this->assertStringContainsString('2 pasajero(s) pendientes por registrar', $lead->details);
     }
 
     public function test_chatbot_directly_registers_companions_included_in_multiscreen_flow(): void
