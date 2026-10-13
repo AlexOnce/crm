@@ -6,9 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CrmChatController;
 use App\Http\Controllers\Api\FlightBookingController;
 use App\Http\Controllers\Api\PushSubscriptionController;
-use App\Http\Controllers\Webhooks\EvolutionWebhookController;
 use App\Http\Controllers\Webhooks\MetaWebhookController;
-use App\Http\Middleware\ValidateWebhookSecret;
 use App\Services\FlightMicroservice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -25,14 +23,6 @@ Route::get('/webhook/whatsapp', [MetaWebhookController::class, 'verify']);
 // Recepción de mensajes en tiempo real desde Meta Cloud API
 Route::post('/webhooks/whatsapp', [MetaWebhookController::class, 'handle']);
 Route::post('/webhook/whatsapp', [MetaWebhookController::class, 'handle']);
-
-/*
-|--------------------------------------------------------------------------
-| Webhook Opcional de Evolution API (Compatibilidad)
-|--------------------------------------------------------------------------
-*/
-Route::post('/webhooks/evolution', [EvolutionWebhookController::class, 'handle'])
-    ->middleware(ValidateWebhookSecret::class);
 
 /*
 |--------------------------------------------------------------------------

@@ -35,13 +35,6 @@ return [
         ],
     ],
 
-    'evolution' => [
-        'url' => env('EVOLUTION_API_URL', 'http://127.0.0.1:8080'),
-        'api_key' => env('EVOLUTION_API_KEY'),
-        'instance' => env('EVOLUTION_INSTANCE', 'airline_prod'),
-        'webhook_secret' => env('EVOLUTION_WEBHOOK_SECRET'),
-    ],
-
     'meta' => [
         'token' => env('META_WHATSAPP_TOKEN'),
         'phone_number_id' => env('META_PHONE_NUMBER_ID'),
@@ -68,6 +61,16 @@ return [
     'airline' => [
         'itinerario_image_url' => env('AIRLINE_ITINERARIO_IMAGE_URL', ''),
         'itinerario_web_url' => env('AIRLINE_ITINERARIO_WEB_URL', 'https://tamep.bo/itinerarios'),
+    ],
+
+    'goip' => [
+        'host' => env('GOIP_HOST', '192.168.1.100'),
+        'port' => env('GOIP_PORT', 80),
+        'user' => env('GOIP_USER', 'admin'),
+        'password' => env('GOIP_PASSWORD', 'admin'),
+        'line' => (int) env('GOIP_LINE', 1),
+        'delay' => (int) env('GOIP_DELAY_SECONDS', 15),
+        'timeout' => (int) env('GOIP_TIMEOUT_SECONDS', 20),
     ],
 
 ];

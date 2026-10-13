@@ -15,7 +15,6 @@ class ChatMessage extends Model
         'sender',
         'agent_id',
         'message',
-        'evolution_message_id',
         'media_url',
         'media_type',
     ];
