@@ -7,6 +7,7 @@ use App\Jobs\ProcessMassBroadcastJob;
 use App\Models\BroadcastCampaign;
 use App\Models\BroadcastRecipient;
 use App\Models\Lead;
+use App\Services\FlightManifestParserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class MassBroadcastController extends Controller
             'destination' => 'nullable|string|max:10',
             'status' => 'nullable|string', // 'emitido', 'comprado', 'todos'
             'manual_phones' => 'nullable|string', // lista separada por comas o saltos de línea
+            'manifest_passengers' => 'nullable|array',
             'message' => 'nullable|string|max:1000',
         ]);
 
@@ -112,6 +114,27 @@ class MassBroadcastController extends Controller
             }
         }
 
+        // 4. Incorporar pasajeros procedentes del Manifiesto PDF si fueron cargados
+        if (! empty($validated['manifest_passengers'])) {
+            foreach ($validated['manifest_passengers'] as $pax) {
+                $cleanPhone = preg_replace('/\D/', '', (string) ($pax['phone'] ?? ''));
+                if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
+                    $seenPhones[$cleanPhone] = true;
+                    $uniquePassengers[] = [
+                        'id' => null,
+                        'passenger_name' => $pax['passenger_name'] ?? 'Pasajero',
+                        'phone' => $cleanPhone,
+                        'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
+                        'flight_date' => $validated['flight_date'] ?? null,
+                        'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
+                        'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
+                        'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
+                        'status' => 'manifest_pdf',
+                    ];
+                }
+            }
+        }
+
         $totalRecipients = count($uniquePassengers);
 
         // 4. Calcular costo estimado de SMS según longitud de la plantilla
@@ -152,6 +175,7 @@ class MassBroadcastController extends Controller
             'destination' => 'nullable|string|max:10',
             'status' => 'nullable|string',
             'manual_phones' => 'nullable|string',
+            'manifest_passengers' => 'nullable|array',
         ]);
 
         $validated['channel'] = 'sms';
@@ -246,6 +270,38 @@ class MassBroadcastController extends Controller
                             'phone' => $cleanPhone,
                             'passenger_name' => null,
                             'flight_number' => $validated['flight_number'] ?? null,
+                            'message' => $personalized,
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    }
+                }
+            }
+
+            // 3. Destinatarios del Manifiesto PDF
+            if (! empty($validated['manifest_passengers'])) {
+                foreach ($validated['manifest_passengers'] as $pax) {
+                    $cleanPhone = preg_replace('/\D/', '', (string) ($pax['phone'] ?? ''));
+                    if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
+                        $seenPhones[$cleanPhone] = true;
+                        $paxInfo = [
+                            'passenger_name' => $pax['passenger_name'] ?? 'Pasajero',
+                            'phone' => $cleanPhone,
+                            'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
+                            'flight_date' => $validated['flight_date'] ?? '',
+                            'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
+                            'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
+                            'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
+                        ];
+
+                        $personalized = $this->personalizeMessage($validated['message'], $paxInfo);
+
+                        $recipientsData[] = [
+                            'lead_id' => null,
+                            'phone' => $cleanPhone,
+                            'passenger_name' => $paxInfo['passenger_name'],
+                            'flight_number' => $paxInfo['flight_number'],
                             'message' => $personalized,
                             'status' => 'pending',
                             'created_at' => now(),
@@ -407,5 +463,46 @@ class MassBroadcastController extends Controller
 
         // SMS concatenado (153 chars por segmento)
         return (int) ceil($charsCount / 153);
+    }
+
+    /**
+     * Parsea un manifiesto en formato PDF (desde /documentos/vuelo.pdf o archivo subido).
+     */
+    public function importPdfManifest(Request $request, FlightManifestParserService $parser): JsonResponse
+    {
+        $request->validate([
+            'pdf_file' => 'nullable|file|mimes:pdf|max:20480',
+            'use_default_doc' => 'nullable|boolean',
+        ]);
+
+        if ($request->hasFile('pdf_file')) {
+            $uploaded = $request->file('pdf_file');
+            $tempPath = $uploaded->getRealPath();
+        } else {
+            // Documento por defecto en /documentos/vuelo.pdf
+            $tempPath = base_path('documentos/vuelo.pdf');
+        }
+
+        if (! file_exists($tempPath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró el archivo de manifiesto en: '.$tempPath,
+            ], 404);
+        }
+
+        try {
+            $data = $parser->parsePdf($tempPath);
+
+            return response()->json([
+                'success' => true,
+                'manifest' => $data,
+                'message' => "Manifiesto procesado: {$data['valid_phones_count']} de {$data['total_passengers']} pasajeros con celular boliviano detectados.",
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar el archivo PDF: '.$e->getMessage(),
+            ], 422);
+        }
     }
 }

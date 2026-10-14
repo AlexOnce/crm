@@ -180,4 +180,40 @@ class MassBroadcastSmsTest extends TestCase
 
         Queue::assertPushed(ProcessMassBroadcastJob::class);
     }
+
+    public function test_admin_can_import_pdf_flight_manifest(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/import-pdf', [
+                'use_default_doc' => true,
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'manifest' => [
+                    'flight_number' => '708',
+                    'total_passengers' => 66,
+                    'valid_phones_count' => 66,
+                ],
+            ])
+            ->assertJsonStructure([
+                'manifest' => [
+                    'flight_number',
+                    'departure_date',
+                    'departure_time',
+                    'origin',
+                    'destination',
+                    'total_passengers',
+                    'valid_phones_count',
+                    'passengers',
+                ],
+            ]);
+    }
 }

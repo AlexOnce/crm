@@ -104,8 +104,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/bot-messages/{botMessage}', [AdminDashboardController::class, 'updateBotMessage']);
         Route::post('/bot-messages/{botMessage}/restore', [AdminDashboardController::class, 'restoreBotMessage']);
 
-        // Difusión y Mensajería Masiva de Vuelos (SMS GoIP & Meta WhatsApp)
+        // Difusión y Mensajería Masiva de Vuelos (Exclusivo SMS GoIP - Entel)
         Route::post('/broadcasts/preview', [MassBroadcastController::class, 'preview']);
+        Route::post('/broadcasts/import-pdf', [MassBroadcastController::class, 'importPdfManifest']);
         Route::get('/broadcasts', [MassBroadcastController::class, 'index']);
         Route::post('/broadcasts', [MassBroadcastController::class, 'store']);
         Route::get('/broadcasts/{campaign}', [MassBroadcastController::class, 'show']);

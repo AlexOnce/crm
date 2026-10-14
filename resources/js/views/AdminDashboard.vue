@@ -1542,7 +1542,127 @@
                   <Plane class="w-4 h-4 text-sky-500" />
                   <span>1. Seleccionar Pasajeros / Vuelo</span>
                 </h3>
-                <span class="text-[11px] text-slate-400">Filtrado desde reservas locales</span>
+                <span class="text-[11px] text-slate-400">Filtrado local o importación PDF</span>
+              </div>
+
+              <!-- Panel de Importación de Manifiesto PDF Oficial (/documentos/vuelo.pdf) -->
+              <div class="p-4 rounded-xl border border-sky-500/20 bg-sky-50/50 dark:bg-sky-950/20 space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
+                      <FileText class="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>Cargar Manifiesto de Vuelo (PDF)</span>
+                        <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30">
+                          Recomendado
+                        </span>
+                      </h4>
+                      <p class="text-[11px] text-slate-500">
+                        Extrae vuelo, ruta, fecha y celulares de los pasajeros desde el reporte PDF.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <!-- Botón directo para el archivo cargado en /documentos/vuelo.pdf -->
+                    <button 
+                      type="button" 
+                      @click="loadDefaultManifestPdf"
+                      :disabled="manifestLoading"
+                      class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
+                      title="Cargar el archivo /documentos/vuelo.pdf del servidor"
+                    >
+                      <Loader2 v-if="manifestLoading" class="w-3.5 h-3.5 animate-spin" />
+                      <Download v-else class="w-3.5 h-3.5" />
+                      <span>Cargar /documentos/vuelo.pdf</span>
+                    </button>
+
+                    <!-- Input oculto para subir otro PDF si se desea -->
+                    <input 
+                      type="file" 
+                      ref="manifestFileInput" 
+                      accept=".pdf" 
+                      class="hidden" 
+                      @change="handleManifestFileUpload" 
+                    />
+                    <button 
+                      type="button" 
+                      @click="$refs.manifestFileInput.click()"
+                      :disabled="manifestLoading"
+                      class="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                      title="Seleccionar otro archivo PDF de la computadora"
+                    >
+                      <Upload class="w-3.5 h-3.5" />
+                      <span>Subir PDF</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Banner Informativo cuando un Manifiesto está Activo -->
+                <div v-if="importedManifest" class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 space-y-2">
+                  <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div class="flex items-center gap-2 font-mono">
+                      <span class="px-2 py-0.5 rounded font-extrabold bg-emerald-600 text-white text-[11px]">
+                        VUELO {{ importedManifest.flight_number }}
+                      </span>
+                      <span class="font-bold text-slate-900 dark:text-white">
+                        {{ importedManifest.origin }} → {{ importedManifest.destination }}
+                      </span>
+                      <span class="text-slate-500 text-[11px]">
+                        ({{ importedManifest.departure_date_raw }} {{ importedManifest.departure_time }})
+                      </span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                        {{ importedManifest.valid_phones_count }} Pasajeros con Celular
+                      </span>
+                      <button 
+                        type="button" 
+                        @click="showManifestTable = !showManifestTable"
+                        class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                      >
+                        {{ showManifestTable ? 'Ocultar lista' : 'Ver lista detallada' }}
+                      </button>
+                      <button 
+                        type="button" 
+                        @click="clearImportedManifest"
+                        class="p-1 rounded text-slate-400 hover:text-red-500 transition cursor-pointer"
+                        title="Quitar manifiesto"
+                      >
+                        <X class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Mini tabla desplegable de pasajeros del PDF -->
+                  <div v-if="showManifestTable" class="max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px]">
+                    <table class="w-full text-left">
+                      <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 font-semibold sticky top-0">
+                        <tr>
+                          <th class="p-1.5">N°</th>
+                          <th class="p-1.5">PNR</th>
+                          <th class="p-1.5">Pasajero</th>
+                          <th class="p-1.5">DNI</th>
+                          <th class="p-1.5">Celular (GoIP)</th>
+                          <th class="p-1.5">Tarifa</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                        <tr v-for="pax in importedManifest.passengers" :key="pax.num" class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td class="p-1.5 text-slate-400">{{ pax.num }}</td>
+                          <td class="p-1.5 font-bold text-sky-600 dark:text-sky-400">{{ pax.pnr }}</td>
+                          <td class="p-1.5 font-sans font-semibold text-slate-900 dark:text-white">{{ pax.passenger_name }}</td>
+                          <td class="p-1.5">{{ pax.dni || '-' }}</td>
+                          <td class="p-1.5 text-emerald-600 dark:text-emerald-400 font-bold">{{ pax.phone }}</td>
+                          <td class="p-1.5 text-[10px] text-slate-500">{{ pax.tarifa }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
               <!-- Filtros en Grid -->
@@ -3559,7 +3679,13 @@ const broadcastForm = ref({
   destination: '',
   status: 'emitido',
   manual_phones: '',
+  manifest_passengers: [],
 });
+
+const importedManifest = ref(null);
+const manifestLoading = ref(false);
+const showManifestTable = ref(false);
+const manifestFileInput = ref(null);
 
 const broadcastDetailModal = ref({
   isOpen: false,
@@ -3585,7 +3711,7 @@ const smsCostClass = computed(() => {
 
 const previewSimulatedMessage = computed(() => {
   let text = broadcastForm.value.message || '';
-  const pax = broadcastPreviewData.value?.sample_recipients?.[0] || {
+  const pax = importedManifest.value?.passengers?.[0] || broadcastPreviewData.value?.sample_recipients?.[0] || {
     passenger_name: 'Juan Carlos Perez',
     flight_number: broadcastForm.value.flight_number || 'TM-716',
     flight_date: broadcastForm.value.flight_date || '15/10/2026',
@@ -3603,6 +3729,81 @@ const previewSimulatedMessage = computed(() => {
 
   return text;
 });
+
+async function loadDefaultManifestPdf() {
+  manifestLoading.value = true;
+  try {
+    const res = await api.post('/admin/broadcasts/import-pdf', { use_default_doc: true });
+    if (res.data?.success && res.data.manifest) {
+      applyImportedManifest(res.data.manifest);
+      showToast(res.data.message || 'Manifiesto cargado exitosamente.');
+    }
+  } catch (e) {
+    console.error('Error cargando manifiesto:', e);
+    showToast(e.response?.data?.message || 'Error al cargar /documentos/vuelo.pdf', 'error');
+  } finally {
+    manifestLoading.value = false;
+  }
+}
+
+async function handleManifestFileUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  manifestLoading.value = true;
+  const formData = new FormData();
+  formData.append('pdf_file', file);
+
+  try {
+    const res = await api.post('/admin/broadcasts/import-pdf', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    if (res.data?.success && res.data.manifest) {
+      applyImportedManifest(res.data.manifest);
+      showToast(res.data.message || 'Manifiesto procesado exitosamente.');
+    }
+  } catch (e) {
+    console.error('Error subiendo PDF:', e);
+    showToast(e.response?.data?.message || 'Error al procesar el archivo PDF', 'error');
+  } finally {
+    manifestLoading.value = false;
+    if (event.target) event.target.value = '';
+  }
+}
+
+function applyImportedManifest(manifest) {
+  importedManifest.value = manifest;
+  showManifestTable.value = false;
+
+  // Auto-completar los datos del formulario con el manifiesto
+  if (manifest.flight_number) {
+    broadcastForm.value.flight_number = manifest.flight_number;
+    broadcastForm.value.title = `Aviso Vuelo ${manifest.flight_number}`;
+  }
+  if (manifest.departure_date) {
+    broadcastForm.value.flight_date = manifest.departure_date;
+  }
+  if (manifest.origin) {
+    broadcastForm.value.origin = manifest.origin;
+  }
+  if (manifest.destination) {
+    broadcastForm.value.destination = manifest.destination;
+  }
+
+  // Guardar lista de pasajeros en el formulario
+  broadcastForm.value.manifest_passengers = manifest.passengers || [];
+
+  // Calcular previsualización inmediata con los datos del manifiesto
+  fetchBroadcastPreview();
+}
+
+function clearImportedManifest() {
+  importedManifest.value = null;
+  showManifestTable.value = false;
+  broadcastForm.value.manifest_passengers = [];
+  broadcastPreviewData.value = null;
+  fetchBroadcastPreview();
+}
 
 function applySmsTemplate(type) {
   broadcastForm.value.template_type = type;
