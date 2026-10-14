@@ -90,12 +90,24 @@ def parse_flight_pdf(pdf_path):
             all_nums = re.findall(r'\b(\d{5,9}[A-Z]?)\b', rest)
             dni = all_nums[1] if len(all_nums) > 1 else None
 
+        # Apellido paterno del pasajero
+        name_parts = name.split()
+        if not name_parts:
+            paternal_surname = "Pasajero"
+        elif name_parts[0].upper() == "DE" and len(name_parts) > 2 and name_parts[1].upper() == "LA":
+            paternal_surname = f"{name_parts[0]} {name_parts[1]} {name_parts[2]}"
+        elif name_parts[0].upper() in ["DE", "DEL"] and len(name_parts) > 1:
+            paternal_surname = f"{name_parts[0]} {name_parts[1]}"
+        else:
+            paternal_surname = name_parts[0]
+
         passengers.append({
             "num": num,
             "pnr": pnr,
             "origin": origin,
             "destination": dest,
             "passenger_name": name,
+            "paternal_surname": paternal_surname,
             "tarifa": tarifa,
             "dni": dni,
             "phone": phone,
@@ -103,6 +115,23 @@ def parse_flight_pdf(pdf_path):
         })
 
     valid_phones = [p for p in passengers if p.get("phone")]
+
+    airport_cities = {
+        "VVI": "Santa Cruz",
+        "SRZ": "Santa Cruz",
+        "LPB": "La Paz",
+        "CBB": "Cochabamba",
+        "TJA": "Tarija",
+        "SRE": "Sucre",
+        "CIJ": "Cobija",
+        "TDD": "Trinidad",
+        "RIB": "Riberalta",
+        "GYA": "Guayaramerin",
+        "RBQ": "Rurrenabaque",
+        "UYU": "Uyuni",
+        "BYC": "Yacuiba",
+        "POI": "Potosi"
+    }
 
     return {
         "success": True,
@@ -112,6 +141,8 @@ def parse_flight_pdf(pdf_path):
         "departure_time": departure_time,
         "origin": default_origin,
         "destination": default_dest,
+        "origin_city": airport_cities.get(default_origin.upper(), default_origin),
+        "destination_city": airport_cities.get(default_dest.upper(), default_dest),
         "total_passengers": len(passengers),
         "valid_phones_count": len(valid_phones),
         "passengers": passengers

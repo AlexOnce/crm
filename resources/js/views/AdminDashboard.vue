@@ -1849,7 +1849,7 @@
                       :class="broadcastForm.template_type === 'flight_delay' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
                       class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
                     >
-                      Demora (1 SMS)
+                      Demora (19:00)
                     </button>
                     <button 
                       type="button" 
@@ -1857,15 +1857,15 @@
                       :class="broadcastForm.template_type === 'flight_cancellation' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
                       class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
                     >
-                      Cancelación
+                      Cancelación Mant.
                     </button>
                     <button 
                       type="button" 
-                      @click="applySmsTemplate('flight_reminder')"
-                      :class="broadcastForm.template_type === 'flight_reminder' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
+                      @click="applySmsTemplate('eptam_cancellation')"
+                      :class="broadcastForm.template_type === 'eptam_cancellation' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
                       class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
                     >
-                      Recordatorio 2h
+                      Cancelación EPTAM
                     </button>
                     <button 
                       type="button" 
@@ -1935,7 +1935,7 @@
                   <span class="block text-[11px] font-semibold text-slate-500 mb-1">Insertar variables:</span>
                   <div class="flex flex-wrap gap-1">
                     <button 
-                      v-for="tag in ['{pasajero}', '{vuelo}', '{fecha}', '{origen}', '{destino}', '{pnr}']"
+                      v-for="tag in ['{apellido}', '{pasajero}', '{vuelo}', '{origen}', '{destino}', '{fecha}', '{hora}', '{pnr}']"
                       :key="tag"
                       type="button"
                       @click="insertSmsTag(tag)"
@@ -3663,69 +3663,82 @@ const broadcastPreviewLoading = ref(false);
 const broadcastPreviewData = ref(null);
 
 const smsTemplates = {
-  flight_delay: 'TAMEP Informa: Estimado pasajero, su vuelo {vuelo} ({origen}-{destino}) del {fecha} ha sido demorado para las 19:00. Consultas: 72223334 o www.tamep.bo. Empresa regulada por ATT.',
-  flight_cancellation: 'TAMEP Informa: Su vuelo {vuelo} del {fecha} fue cancelado por causas operacionales. Para reprogramacion comunicarse con el 72223334 o www.tamep.bo. Regulada por ATT.',
-  flight_reminder: 'TAMEP Informa: Recordatorio de su vuelo {vuelo} ({origen}-{destino}) el {fecha}. Presentarse 2h antes en aeropuerto con documento de identidad. Consultas: 72223334.',
-  custom: 'TAMEP Informa: Estimado(a) {pasajero}, le comunicamos que ',
+  flight_delay: 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue demorado para las 19:00. Consultas: WhatsApp 73748234 o 57075796.',
+  flight_cancellation: 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue cancelado por mantenimiento. Consultas: WhatsApp 73748234 o 57075796.',
+  eptam_cancellation: 'EPTAM informa: El vuelo {vuelo} {origen}-{destino} de las {hora} fue cancelado. Para mayor informacion, comuniquese con nuestra oficina o espere nuevas instrucciones.',
+  flight_reminder: 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} se encuentra confirmado. Consultas: WhatsApp 73748234 o 57075796.',
+  custom: 'Estimado pasajero {apellido}: TAMEP informa que ',
 };
 
-const broadcastForm = ref({
-  title: 'Demora de Vuelo',
-  template_type: 'flight_delay',
-  message: smsTemplates.flight_delay,
-  flight_number: '',
-  flight_date: new Date().toISOString().split('T')[0],
-  origin: '',
-  destination: '',
-  status: 'emitido',
-  manual_phones: '',
-  manifest_passengers: [],
-});
+const airportCityNames = {
+  VVI: 'Santa Cruz',
+  SRZ: 'Santa Cruz',
+  LPB: 'La Paz',
+  CBB: 'Cochabamba',
+  TJA: 'Tarija',
+  SRE: 'Sucre',
+  CIJ: 'Cobija',
+  TDD: 'Trinidad',
+  RIB: 'Riberalta',
+  GYA: 'Guayaramerin',
+  RBQ: 'Rurrenabaque',
+  UYU: 'Uyuni',
+  BYC: 'Yacuiba',
+  POI: 'Potosi',
+};
 
-const importedManifest = ref(null);
-const manifestLoading = ref(false);
-const showManifestTable = ref(false);
-const manifestFileInput = ref(null);
+function resolveCity(code) {
+  if (!code) return '';
+  return airportCityNames[String(code).toUpperCase()] || code;
+}
 
-const broadcastDetailModal = ref({
-  isOpen: false,
-  loading: false,
-  campaign: null,
-  recipients: [],
-});
-
-const smsCharCount = computed(() => (broadcastForm.value.message || '').length);
-
-const smsSegmentCount = computed(() => {
-  const len = smsCharCount.value;
-  if (len <= 0) return 0;
-  if (len <= 160) return 1;
-  return Math.ceil(len / 153);
-});
-
-const smsCostClass = computed(() => {
-  if (smsSegmentCount.value <= 1) return 'text-emerald-500';
-  if (smsSegmentCount.value === 2) return 'text-amber-500';
-  return 'text-red-500';
-});
+function extractPaternalSurname(fullName) {
+  if (!fullName) return 'Pasajero';
+  const parts = String(fullName).trim().split(/\s+/);
+  if (!parts.length) return 'Pasajero';
+  const first = parts[0].toUpperCase();
+  if (first === 'DE' && parts.length > 2 && parts[1].toUpperCase() === 'LA') {
+    return `${parts[0]} ${parts[1]} ${parts[2]}`;
+  }
+  if (['DE', 'DEL'].includes(first) && parts.length > 1) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return parts[0];
+}
 
 const previewSimulatedMessage = computed(() => {
   let text = broadcastForm.value.message || '';
   const pax = importedManifest.value?.passengers?.[0] || broadcastPreviewData.value?.sample_recipients?.[0] || {
-    passenger_name: 'Juan Carlos Perez',
-    flight_number: broadcastForm.value.flight_number || 'TM-716',
-    flight_date: broadcastForm.value.flight_date || '15/10/2026',
+    passenger_name: 'CALLIZAYA ANTONIO VICTOR HUGO',
+    paternal_surname: 'CALLIZAYA',
+    flight_number: broadcastForm.value.flight_number || '708',
+    flight_date: broadcastForm.value.flight_date || '11/10/2026',
     origin: broadcastForm.value.origin || 'VVI',
     destination: broadcastForm.value.destination || 'LPB',
-    booking_reference: 'TM-9214',
+    booking_reference: 'UUA84U',
   };
 
-  text = text.replace(/{pasajero}|{nombre}/gi, pax.passenger_name || 'Juan Carlos Perez');
-  text = text.replace(/{vuelo}/gi, pax.flight_number || 'TM-716');
-  text = text.replace(/{fecha}/gi, pax.flight_date || '15/10');
-  text = text.replace(/{origen}/gi, pax.origin || 'VVI');
-  text = text.replace(/{destino}/gi, pax.destination || 'LPB');
-  text = text.replace(/{pnr}/gi, pax.booking_reference || 'TM-9214');
+  const surname = pax.paternal_surname || extractPaternalSurname(pax.passenger_name);
+  const origCity = resolveCity(broadcastForm.value.origin || pax.origin);
+  const destCity = resolveCity(broadcastForm.value.destination || pax.destination);
+
+  let dateStr = broadcastForm.value.flight_date || pax.flight_date || '11/10/2026';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split('-');
+    dateStr = `${d}/${m}/${y}`;
+  }
+
+  const timeStr = importedManifest.value?.departure_time || '23:20';
+
+  text = text.replace(/{apellido}|{apellido_paterno}/gi, surname);
+  text = text.replace(/{pasajero}|{nombre}/gi, pax.passenger_name || 'CALLIZAYA ANTONIO VICTOR HUGO');
+  text = text.replace(/{vuelo}/gi, broadcastForm.value.flight_number || pax.flight_number || '708');
+  text = text.replace(/{fecha}/gi, dateStr);
+  text = text.replace(/{hora}/gi, timeStr);
+  text = text.replace(/{origen}/gi, origCity);
+  text = text.replace(/{destino}/gi, destCity);
+  text = text.replace(/{ruta}/gi, `${origCity}-${destCity}`);
+  text = text.replace(/{pnr}/gi, pax.booking_reference || pax.pnr || 'UUA84U');
 
   return text;
 });

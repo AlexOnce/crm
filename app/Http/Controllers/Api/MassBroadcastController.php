@@ -167,7 +167,7 @@ class MassBroadcastController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:150',
             'channel' => 'nullable|in:sms',
-            'template_type' => 'nullable|in:flight_delay,flight_cancellation,flight_reminder,custom',
+            'template_type' => 'nullable|string|max:50',
             'message' => 'required|string|max:1000',
             'flight_number' => 'nullable|string|max:20',
             'flight_date' => 'nullable|date',
@@ -434,17 +434,93 @@ class MassBroadcastController extends Controller
      */
     protected function personalizeMessage(string $template, array $data): string
     {
+        $fullName = $data['passenger_name'] ?? 'Pasajero';
+        $paternalSurname = $data['paternal_surname'] ?? $this->extractPaternalSurname($fullName);
+        $originCity = $this->resolveCityName($data['origin'] ?? '');
+        $destinationCity = $this->resolveCityName($data['destination'] ?? '');
+        $flightNumber = $data['flight_number'] ?? '';
+        $flightDate = $data['flight_date'] ?? '';
+        $flightTime = $data['flight_time'] ?? ($data['departure_time'] ?? '15:30');
+
+        // Si la fecha viene en formato ISO (YYYY-MM-DD), formatear a DD/MM/YYYY
+        if (is_string($flightDate) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $flightDate, $m)) {
+            $flightDate = "{$m[3]}/{$m[2]}/{$m[1]}";
+        }
+
         $replacements = [
-            '{pasajero}' => $data['passenger_name'] ?? 'Pasajero',
-            '{nombre}' => $data['passenger_name'] ?? 'Pasajero',
-            '{vuelo}' => $data['flight_number'] ?? '',
-            '{fecha}' => $data['flight_date'] ?? '',
-            '{origen}' => $data['origin'] ?? '',
-            '{destino}' => $data['destination'] ?? '',
-            '{pnr}' => $data['booking_reference'] ?? '',
+            '{apellido}' => $paternalSurname,
+            '{apellido_paterno}' => $paternalSurname,
+            '{pasajero}' => $fullName,
+            '{nombre}' => $fullName,
+            '{vuelo}' => $flightNumber,
+            '{fecha}' => $flightDate,
+            '{hora}' => $flightTime,
+            '{origen}' => $originCity,
+            '{destino}' => $destinationCity,
+            '{ruta}' => "{$originCity}-{$destinationCity}",
+            '{pnr}' => $data['booking_reference'] ?? ($data['pnr'] ?? ''),
         ];
 
         return str_ireplace(array_keys($replacements), array_values($replacements), $template);
+    }
+
+    /**
+     * Extrae el apellido paterno del nombre completo del pasajero.
+     */
+    protected function extractPaternalSurname(?string $fullName): string
+    {
+        if (empty($fullName)) {
+            return 'Pasajero';
+        }
+
+        $clean = trim(preg_replace('/\s+/u', ' ', $fullName));
+        $parts = explode(' ', $clean);
+
+        if (empty($parts)) {
+            return 'Pasajero';
+        }
+
+        $first = strtoupper($parts[0]);
+        if ($first === 'DE' && isset($parts[1]) && strtoupper($parts[1]) === 'LA' && isset($parts[2])) {
+            return $parts[0].' '.$parts[1].' '.$parts[2];
+        }
+
+        if (($first === 'DE' || $first === 'DEL') && isset($parts[1])) {
+            return $parts[0].' '.$parts[1];
+        }
+
+        return $parts[0];
+    }
+
+    /**
+     * Resuelve el nombre común de ciudad para aeropuertos de Bolivia.
+     */
+    protected function resolveCityName(?string $code): string
+    {
+        if (empty($code)) {
+            return '';
+        }
+
+        $airports = [
+            'VVI' => 'Santa Cruz',
+            'SRZ' => 'Santa Cruz',
+            'LPB' => 'La Paz',
+            'CBB' => 'Cochabamba',
+            'TJA' => 'Tarija',
+            'SRE' => 'Sucre',
+            'CIJ' => 'Cobija',
+            'TDD' => 'Trinidad',
+            'RIB' => 'Riberalta',
+            'GYA' => 'Guayaramerin',
+            'RBQ' => 'Rurrenabaque',
+            'UYU' => 'Uyuni',
+            'BYC' => 'Yacuiba',
+            'POI' => 'Potosi',
+        ];
+
+        $upper = strtoupper(trim($code));
+
+        return $airports[$upper] ?? $code;
     }
 
     /**

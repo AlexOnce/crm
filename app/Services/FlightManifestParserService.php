@@ -181,12 +181,25 @@ class FlightManifestParserService
                     }
                 }
 
+                // Apellido paterno
+                $nameParts = preg_split('/\s+/u', $name);
+                if (empty($nameParts) || empty($nameParts[0])) {
+                    $paternalSurname = 'Pasajero';
+                } elseif (strtoupper($nameParts[0]) === 'DE' && isset($nameParts[1]) && strtoupper($nameParts[1]) === 'LA' && isset($nameParts[2])) {
+                    $paternalSurname = "{$nameParts[0]} {$nameParts[1]} {$nameParts[2]}";
+                } elseif (in_array(strtoupper($nameParts[0]), ['DE', 'DEL']) && isset($nameParts[1])) {
+                    $paternalSurname = "{$nameParts[0]} {$nameParts[1]}";
+                } else {
+                    $paternalSurname = $nameParts[0];
+                }
+
                 $passengers[] = [
                     'num' => $num,
                     'pnr' => $pnr,
                     'origin' => $origin,
                     'destination' => $dest,
                     'passenger_name' => $name,
+                    'paternal_surname' => $paternalSurname,
                     'tarifa' => $tarifa,
                     'dni' => $dni,
                     'phone' => $phone,
@@ -197,6 +210,23 @@ class FlightManifestParserService
 
         $validPhones = array_filter($passengers, fn ($p) => ! empty($p['phone']));
 
+        $airportCities = [
+            'VVI' => 'Santa Cruz',
+            'SRZ' => 'Santa Cruz',
+            'LPB' => 'La Paz',
+            'CBB' => 'Cochabamba',
+            'TJA' => 'Tarija',
+            'SRE' => 'Sucre',
+            'CIJ' => 'Cobija',
+            'TDD' => 'Trinidad',
+            'RIB' => 'Riberalta',
+            'GYA' => 'Guayaramerin',
+            'RBQ' => 'Rurrenabaque',
+            'UYU' => 'Uyuni',
+            'BYC' => 'Yacuiba',
+            'POI' => 'Potosi',
+        ];
+
         return [
             'success' => true,
             'flight_number' => $flightNum,
@@ -205,6 +235,8 @@ class FlightManifestParserService
             'departure_time' => $departureTime,
             'origin' => $defaultOrigin,
             'destination' => $defaultDest,
+            'origin_city' => $airportCities[strtoupper($defaultOrigin)] ?? $defaultOrigin,
+            'destination_city' => $airportCities[strtoupper($defaultDest)] ?? $defaultDest,
             'total_passengers' => count($passengers),
             'valid_phones_count' => count($validPhones),
             'passengers' => $passengers,
