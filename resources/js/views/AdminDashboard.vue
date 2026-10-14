@@ -3773,7 +3773,7 @@ async function handleManifestFileUpload(event) {
 
 function applyImportedManifest(manifest) {
   importedManifest.value = manifest;
-  showManifestTable.value = false;
+  showManifestTable.value = true;
 
   // Auto-completar los datos del formulario con el manifiesto
   if (manifest.flight_number) {
