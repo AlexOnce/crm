@@ -9,6 +9,7 @@ use App\Models\ChatMessage;
 use App\Models\Conversation;
 use App\Models\User;
 use App\Services\BroadcastHelper;
+use App\Services\ChatbotEngineService;
 use App\Services\MetaWhatsAppService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -321,13 +322,13 @@ class CrmChatController extends Controller
             if (preg_match('/^passenger_([1-5])$/', $flowType, $matches)) {
                 $pax = (int) $matches[1];
             } else {
-                $pax = (int) ($conversation->latestLead?->passengers_count 
-                    ?? $conversation->session_data['passengers'] 
-                    ?? $conversation->session_data['passengers_count'] 
+                $pax = (int) ($conversation->latestLead?->passengers_count
+                    ?? $conversation->session_data['passengers']
+                    ?? $conversation->session_data['passengers_count']
                     ?? 1);
             }
 
-            $chatbot = app(\App\Services\ChatbotEngineService::class);
+            $chatbot = app(ChatbotEngineService::class);
             $flowId = $chatbot->getPassengerFlowIdForCount($pax);
             $footerText = $pax > 1 ? "Nómina Oficial ({$pax} Pasajeros)" : 'Formulario Seguro de Pasajero';
 

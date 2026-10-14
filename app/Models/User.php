@@ -45,4 +45,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(ChatMessage::class, 'agent_id');
     }
+
+    public function broadcastCampaigns(): HasMany
+    {
+        return $this->hasMany(BroadcastCampaign::class);
+    }
 }

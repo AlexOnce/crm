@@ -112,7 +112,7 @@ class AdminDashboardController extends Controller
                             $sub->where('status', 'nuevo')
                                 ->whereHas('conversation', function ($cq) {
                                     $cq->where('status', 'human_live')
-                                       ->orWhereNotNull('assigned_user_id');
+                                        ->orWhereNotNull('assigned_user_id');
                                 });
                         });
                 });
@@ -120,7 +120,7 @@ class AdminDashboardController extends Controller
                 $query->where('status', 'nuevo')
                     ->whereDoesntHave('conversation', function ($cq) {
                         $cq->where('status', 'human_live')
-                           ->orWhereNotNull('assigned_user_id');
+                            ->orWhereNotNull('assigned_user_id');
                     });
             } elseif ($status === 'emitido') {
                 $query->whereIn('status', ['emitido', 'comprado']);
@@ -167,7 +167,7 @@ class AdminDashboardController extends Controller
                     $sub->where('status', 'nuevo')
                         ->whereHas('conversation', function ($cq) {
                             $cq->where('status', 'human_live')
-                               ->orWhereNotNull('assigned_user_id');
+                                ->orWhereNotNull('assigned_user_id');
                         });
                 });
         };
@@ -177,7 +177,7 @@ class AdminDashboardController extends Controller
             'nuevo' => Lead::where('status', 'nuevo')
                 ->whereDoesntHave('conversation', function ($cq) {
                     $cq->where('status', 'human_live')
-                       ->orWhereNotNull('assigned_user_id');
+                        ->orWhereNotNull('assigned_user_id');
                 })->count(),
             'contactado' => Lead::where($inProcessCondition)->count(),
             'emitido' => Lead::whereIn('status', ['emitido', 'comprado'])->count(),

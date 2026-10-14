@@ -49,4 +49,9 @@ class Lead extends Model
     {
         return $this->hasMany(Attachment::class);
     }
+
+    public function broadcastRecipients(): HasMany
+    {
+        return $this->hasMany(BroadcastRecipient::class);
+    }
 }

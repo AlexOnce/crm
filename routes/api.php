@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AgentManagementController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CrmChatController;
 use App\Http\Controllers\Api\FlightBookingController;
+use App\Http\Controllers\Api\MassBroadcastController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Webhooks\MetaWebhookController;
 use App\Services\FlightMicroservice;
@@ -102,5 +103,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/bot-messages', [AdminDashboardController::class, 'getBotMessages']);
         Route::put('/bot-messages/{botMessage}', [AdminDashboardController::class, 'updateBotMessage']);
         Route::post('/bot-messages/{botMessage}/restore', [AdminDashboardController::class, 'restoreBotMessage']);
+
+        // Difusión y Mensajería Masiva de Vuelos (SMS GoIP & Meta WhatsApp)
+        Route::post('/broadcasts/preview', [MassBroadcastController::class, 'preview']);
+        Route::get('/broadcasts', [MassBroadcastController::class, 'index']);
+        Route::post('/broadcasts', [MassBroadcastController::class, 'store']);
+        Route::get('/broadcasts/{campaign}', [MassBroadcastController::class, 'show']);
+        Route::post('/broadcasts/{campaign}/retry-failed', [MassBroadcastController::class, 'retryFailed']);
     });
 });

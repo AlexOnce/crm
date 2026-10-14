@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\BroadcastCampaign;
+use App\Models\BroadcastRecipient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -41,7 +43,8 @@ class SendGoipSmsNotification implements ShouldQueue
         public string $phone,
         public string $message,
         public ?int $leadId = null,
-        public ?int $line = null
+        public ?int $line = null,
+        public ?int $broadcastRecipientId = null
     ) {
         // Asignar preferentemente a una cola dedicada de SMS
         $this->onQueue('sms');
@@ -125,10 +128,26 @@ class SendGoipSmsNotification implements ShouldQueue
                 $dispatchId = $matches[1];
             }
 
+            // Actualizar registro de destinatario en campaña masiva si aplica
+            if ($this->broadcastRecipientId) {
+                $recipient = BroadcastRecipient::find($this->broadcastRecipientId);
+                if ($recipient) {
+                    $recipient->update([
+                        'status' => 'sent',
+                        'channel_used' => 'sms',
+                        'gateway_message_id' => $dispatchId,
+                        'sent_at' => now(),
+                    ]);
+                    $recipient->campaign?->increment('sent_count');
+                    $this->checkCampaignCompletion($recipient->campaign);
+                }
+            }
+
             Log::info("SendGoipSmsNotification: SMS enviado con éxito a {$cleanPhone}", [
                 'goip_id' => $dispatchId,
                 'response_summary' => substr(strip_tags($responseBody), 0, 100),
                 'lead_id' => $this->leadId,
+                'broadcast_recipient_id' => $this->broadcastRecipientId,
             ]);
         } catch (\Throwable $e) {
             Log::error('SendGoipSmsNotification: Excepción al comunicarse con el hardware GoIP: '.$e->getMessage(), [
@@ -136,6 +155,20 @@ class SendGoipSmsNotification implements ShouldQueue
                 'lead_id' => $this->leadId,
                 'attempt' => $this->attempts(),
             ]);
+
+            // Si se agotaron los intentos o falló definitivamente, marcar destinatario como fallido
+            if ($this->broadcastRecipientId && $this->attempts() >= $this->tries) {
+                $recipient = BroadcastRecipient::find($this->broadcastRecipientId);
+                if ($recipient) {
+                    $recipient->update([
+                        'status' => 'failed',
+                        'channel_used' => 'sms',
+                        'error_message' => $e->getMessage(),
+                    ]);
+                    $recipient->campaign?->increment('failed_count');
+                    $this->checkCampaignCompletion($recipient->campaign);
+                }
+            }
 
             // Permitir que el sistema de colas maneje los reintentos o marque como fallido
             throw $e;
@@ -145,6 +178,24 @@ class SendGoipSmsNotification implements ShouldQueue
             if ($delaySeconds > 0) {
                 sleep($delaySeconds);
             }
+        }
+    }
+
+    /**
+     * Verifica si todos los destinatarios de la campaña terminaron para marcarla como completada.
+     */
+    private function checkCampaignCompletion(?BroadcastCampaign $campaign): void
+    {
+        if (! $campaign) {
+            return;
+        }
+
+        $pending = $campaign->recipients()->whereIn('status', ['pending', 'processing'])->count();
+        if ($pending === 0) {
+            $campaign->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+            ]);
         }
     }
 
