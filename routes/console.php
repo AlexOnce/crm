@@ -621,3 +621,8 @@ Artisan::command('meta:simulate-ad-user {name=Valeria Morales} {phone=5917654321
 
     return 0;
 })->purpose('Simular usuario completo que entra desde anuncio de Facebook con mensaje y respuesta del bot');
+
+// Despachador de colas en segundo plano para cPanel (Procesa SMS masivos con GoIP sin bloquear el hosting)
+Schedule::command('queue:work --stop-when-empty --queue=sms,default')
+    ->everyMinute()
+    ->withoutOverlapping();

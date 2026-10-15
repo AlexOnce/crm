@@ -107,6 +107,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         // Difusión y Mensajería Masiva de Vuelos (Exclusivo SMS GoIP - Entel)
         Route::post('/broadcasts/preview', [MassBroadcastController::class, 'preview']);
         Route::post('/broadcasts/import-pdf', [MassBroadcastController::class, 'importPdfManifest']);
+        Route::post('/broadcasts/check-flight', [MassBroadcastController::class, 'checkFlightStatus']);
+        Route::post('/broadcasts/process-queue', [MassBroadcastController::class, 'processQueueNow']);
         Route::get('/broadcasts', [MassBroadcastController::class, 'index']);
         Route::post('/broadcasts', [MassBroadcastController::class, 'store']);
         Route::get('/broadcasts/{campaign}', [MassBroadcastController::class, 'show']);

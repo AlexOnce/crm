@@ -8,8 +8,11 @@ use App\Models\BroadcastCampaign;
 use App\Models\BroadcastRecipient;
 use App\Models\Lead;
 use App\Services\FlightManifestParserService;
+use App\Services\FlightMicroservice;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 class MassBroadcastController extends Controller
@@ -22,6 +25,7 @@ class MassBroadcastController extends Controller
         $validated = $request->validate([
             'flight_number' => 'nullable|string|max:20',
             'flight_date' => 'nullable|date',
+            'flight_time' => 'nullable|string|max:20',
             'origin' => 'nullable|string|max:10',
             'destination' => 'nullable|string|max:10',
             'status' => 'nullable|string', // 'emitido', 'comprado', 'todos'
@@ -77,6 +81,7 @@ class MassBroadcastController extends Controller
                         'phone' => $clean,
                         'flight_number' => $validated['flight_number'] ?? 'N/A',
                         'flight_date' => $validated['flight_date'] ?? null,
+                        'flight_time' => $validated['flight_time'] ?? null,
                         'origin' => $validated['origin'] ?? '',
                         'destination' => $validated['destination'] ?? '',
                         'booking_reference' => null,
@@ -103,6 +108,7 @@ class MassBroadcastController extends Controller
                         'phone' => $cleanPhone,
                         'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
                         'flight_date' => $validated['flight_date'] ?? null,
+                        'flight_time' => $validated['flight_time'] ?? ($pax['departure_time'] ?? null),
                         'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
                         'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
                         'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
@@ -124,6 +130,7 @@ class MassBroadcastController extends Controller
                     'phone' => $cleanPhone,
                     'flight_number' => $lead->flight_number,
                     'flight_date' => $lead->flight_date?->format('Y-m-d') ?: (string) $lead->flight_date,
+                    'flight_time' => $validated['flight_time'] ?? null,
                     'origin' => $lead->origin,
                     'destination' => $lead->destination,
                     'booking_reference' => $lead->booking_reference,
@@ -176,6 +183,7 @@ class MassBroadcastController extends Controller
             'message' => 'required|string|max:1000',
             'flight_number' => 'nullable|string|max:20',
             'flight_date' => 'nullable|date',
+            'flight_time' => 'nullable|string|max:20',
             'origin' => 'nullable|string|max:10',
             'destination' => 'nullable|string|max:10',
             'status' => 'nullable|string',
@@ -234,6 +242,7 @@ class MassBroadcastController extends Controller
                             'phone' => $cleanPhone,
                             'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
                             'flight_date' => $validated['flight_date'] ?? '',
+                            'flight_time' => $validated['flight_time'] ?? ($pax['departure_time'] ?? null),
                             'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
                             'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
                             'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
@@ -266,6 +275,7 @@ class MassBroadcastController extends Controller
                         'phone' => $cleanPhone,
                         'flight_number' => $lead->flight_number ?: '',
                         'flight_date' => $lead->flight_date?->format('d/m/Y') ?: '',
+                        'flight_time' => $validated['flight_time'] ?? null,
                         'origin' => $lead->origin ?: '',
                         'destination' => $lead->destination ?: '',
                         'booking_reference' => $lead->booking_reference ?: '',
@@ -299,6 +309,7 @@ class MassBroadcastController extends Controller
                             'phone' => $cleanPhone,
                             'flight_number' => $validated['flight_number'] ?? '',
                             'flight_date' => $validated['flight_date'] ?? '',
+                            'flight_time' => $validated['flight_time'] ?? null,
                             'origin' => $validated['origin'] ?? '',
                             'destination' => $validated['destination'] ?? '',
                             'booking_reference' => '',
@@ -457,16 +468,17 @@ class MassBroadcastController extends Controller
             $flightDate = "{$m[3]}/{$m[2]}/{$m[1]}";
         }
 
-        // Si la plantilla incluye "Estimado pasajero:", simplificarlo a solo el apellido paterno
+        // Normalizar fórmulas de saludo o prefijos al estándar "Sr/Sra {apellido}: "
         $trimmed = trim($template);
-        $cleaned = preg_replace('/^Estimad[oa]\s+pasajer[oa]\s*(\{apellido\})?:\s*/iu', '{apellido}: ', $trimmed);
-        if ($cleaned !== null && $cleaned !== $trimmed) {
-            $template = $cleaned;
+        if (preg_match('/^(?:Estimad[oa]\s+pasajer[oa]|Sr(?:@|\(a\))?\.?)\s*(\{apellido\})?:\s*/iu', $trimmed)) {
+            $template = preg_replace('/^(?:Estimad[oa]\s+pasajer[oa]|Sr(?:@|\(a\))?\.?)\s*(\{apellido\})?:\s*/iu', 'Sr/Sra {apellido}: ', $trimmed);
+        } elseif (preg_match('/^\{apellido(?:_paterno)?\}:\s*/iu', $trimmed)) {
+            $template = preg_replace('/^\{apellido(?:_paterno)?\}:\s*/iu', 'Sr/Sra {apellido}: ', $trimmed);
         }
 
-        // Si la plantilla no contiene ninguna variable de apellido/pasajero, anteponer el apellido paterno
+        // Si la plantilla no contiene ninguna variable de apellido/pasajero ni prefijo, anteponer "Sr/Sra [Apellido]: "
         if (! preg_match('/\{(?:apellido|apellido_paterno|pasajero|nombre)\}/i', $template)) {
-            $template = "{$paternalSurname}: {$template}";
+            $template = "Sr/Sra {$paternalSurname}: {$template}";
         }
 
         $replacements = [
@@ -601,6 +613,124 @@ class MassBroadcastController extends Controller
                 'success' => false,
                 'message' => 'Error al procesar el archivo PDF: '.$e->getMessage(),
             ], 422);
+        }
+    }
+
+    /**
+     * Consulta el estado oficial y reprogramaciones de un vuelo en vivo en Transclick / Airclick.
+     */
+    public function checkFlightStatus(Request $request, FlightMicroservice $flightService): JsonResponse
+    {
+        $validated = $request->validate([
+            'flight_number' => 'required|string',
+            'flight_date' => 'nullable|string',
+            'origin' => 'nullable|string',
+            'destination' => 'nullable|string',
+        ]);
+
+        $cleanFlightNumber = strtoupper(trim(preg_replace('/^TM-?/i', '', $validated['flight_number'])));
+        $date = ! empty($validated['flight_date'])
+            ? Carbon::parse($validated['flight_date'])->format('Y-m-d')
+            : now()->format('Y-m-d');
+
+        $routesToTry = [];
+        if (! empty($validated['origin']) && ! empty($validated['destination'])) {
+            $routesToTry[] = [$validated['origin'], $validated['destination']];
+        } else {
+            // Rutas habituales de TAMep para detección automática
+            $routesToTry = [
+                ['VVI', 'LPB'],
+                ['LPB', 'VVI'],
+                ['CBB', 'LPB'],
+                ['LPB', 'CBB'],
+                ['VVI', 'CBB'],
+                ['CBB', 'VVI'],
+                ['TJA', 'VVI'],
+                ['VVI', 'TJA'],
+                ['SRE', 'LPB'],
+                ['LPB', 'SRE'],
+                ['TDD', 'LPB'],
+                ['CIJ', 'LPB'],
+            ];
+        }
+
+        try {
+            $matchedFlight = null;
+            foreach ($routesToTry as [$orig, $dest]) {
+                $flights = $flightService->searchFlights($orig, $dest, $date);
+                foreach ($flights as $f) {
+                    $num = strtoupper(trim(preg_replace('/^TM-?/i', '', $f['flight_number'])));
+                    if ($num === $cleanFlightNumber || str_contains($num, $cleanFlightNumber)) {
+                        $matchedFlight = $f;
+                        break 2;
+                    }
+                }
+            }
+
+            if ($matchedFlight) {
+                return response()->json([
+                    'success' => true,
+                    'found' => true,
+                    'flight' => $matchedFlight,
+                    'departure_time' => $matchedFlight['departure_time'],
+                    'departure_date' => $matchedFlight['departure_date'],
+                    'origin' => $matchedFlight['origin'],
+                    'destination' => $matchedFlight['destination'],
+                    'origin_city' => $matchedFlight['origin_city'],
+                    'destination_city' => $matchedFlight['destination_city'],
+                    'status' => $matchedFlight['status'] ?? 'Confirmado',
+                    'message' => "Vuelo TM-{$cleanFlightNumber} ({$matchedFlight['origin_city']} → {$matchedFlight['destination_city']}) programado a las {$matchedFlight['departure_time']}.",
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'found' => false,
+                'message' => "El vuelo TM-{$cleanFlightNumber} no figura en la programación de Transclick para el {$date} (Posible cancelación o no comercial).",
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al consultar Transclick: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Procesa la cola de SMS en segundo plano bajo demanda.
+     */
+    public function processQueueNow(): JsonResponse
+    {
+        try {
+            $pendingCount = DB::table('jobs')->whereIn('queue', ['sms', 'default'])->count();
+            if ($pendingCount === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'No hay mensajes pendientes en la cola de envío.',
+                    'processed_count' => 0,
+                ]);
+            }
+
+            // Ejecuta el worker hasta vaciar la cola o procesar lotes
+            Artisan::call('queue:work', [
+                '--stop-when-empty' => true,
+                '--queue' => 'sms,default',
+                '--tries' => 3,
+                '--max-time' => 50,
+            ]);
+
+            $remainingCount = DB::table('jobs')->whereIn('queue', ['sms', 'default'])->count();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Procesados mensajes de la cola. Pendientes restantes: {$remainingCount}.",
+                'remaining_count' => $remainingCount,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar la cola: '.$e->getMessage(),
+            ], 500);
         }
     }
 }

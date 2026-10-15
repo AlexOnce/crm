@@ -8,6 +8,7 @@ use App\Models\BroadcastRecipient;
 use App\Models\Conversation;
 use App\Models\Lead;
 use App\Models\User;
+use App\Services\FlightMicroservice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -244,12 +245,12 @@ class MassBroadcastSmsTest extends TestCase
 
         $response1->assertStatus(200);
         $sampleMsg1 = $response1->json('sample_message');
-        $this->assertStringStartsWith('CALLIZAYA: EPTAM informa:', $sampleMsg1);
+        $this->assertStringStartsWith('Sr/Sra CALLIZAYA: EPTAM informa:', $sampleMsg1);
         $this->assertStringNotContainsString('ANTONIO', $sampleMsg1);
         $this->assertStringNotContainsString('VICTOR', $sampleMsg1);
         $this->assertStringNotContainsString('HUGO', $sampleMsg1);
 
-        // 2. Mensaje con fórmula 'Estimado pasajero {apellido}:' debe simplificarse a solo apellido paterno
+        // 2. Mensaje con fórmula 'Estimado pasajero {apellido}:' debe normalizarse a 'Sr/Sra {apellido}:'
         $response2 = $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/admin/broadcasts/preview', [
                 'message' => 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} fue cancelado por mantenimiento.',
@@ -266,8 +267,94 @@ class MassBroadcastSmsTest extends TestCase
 
         $response2->assertStatus(200);
         $sampleMsg2 = $response2->json('sample_message');
-        $this->assertEquals('MENDOZA: TAMEP informa que su vuelo 702 fue cancelado por mantenimiento.', $sampleMsg2);
+        $this->assertEquals('Sr/Sra MENDOZA: TAMEP informa que su vuelo 702 fue cancelado por mantenimiento.', $sampleMsg2);
         $this->assertStringNotContainsString('Estimado pasajero', $sampleMsg2);
         $this->assertStringNotContainsString('QUISPE', $sampleMsg2);
+    }
+
+    public function test_manual_flight_time_overrides_manifest_departure_time(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        // Pasajero del manifiesto original tenía hora 08:00, pero se cambió manualmente a 12:00
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/preview', [
+                'message' => 'Sr/Sra {apellido}: TAMEP informa que su vuelo {vuelo} de las {hora} fue reprogramado para las 12:00.',
+                'flight_number' => '708',
+                'flight_time' => '12:00', // Modificación manual
+                'manifest_passengers' => [
+                    [
+                        'passenger_name' => 'ARCE ZACONETA CARLOS',
+                        'paternal_surname' => 'ARCE',
+                        'phone' => '74844348',
+                        'departure_time' => '08:00', // Original del PDF
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(200);
+        $msg = $response->json('sample_message');
+        $this->assertStringContainsString('Sr/Sra ARCE:', $msg);
+        $this->assertStringContainsString('12:00', $msg);
+    }
+
+    public function test_admin_can_process_sms_queue_on_demand(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/process-queue');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+    }
+
+    public function test_admin_can_check_flight_status_via_microservice(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $mockFlightService = $this->createMock(FlightMicroservice::class);
+        $mockFlightService->method('searchFlights')->willReturn([
+            [
+                'flight_number' => 'TM-708',
+                'departure_time' => '19:00',
+                'departure_date' => '2026-10-15',
+                'origin' => 'VVI',
+                'destination' => 'LPB',
+                'origin_city' => 'Santa Cruz',
+                'destination_city' => 'La Paz',
+                'status' => 'Programado',
+            ],
+        ]);
+        $this->app->instance(FlightMicroservice::class, $mockFlightService);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/check-flight', [
+                'flight_number' => '708',
+                'flight_date' => '2026-10-15',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'found' => true,
+                'departure_time' => '19:00',
+                'origin' => 'VVI',
+                'destination' => 'LPB',
+            ]);
     }
 }

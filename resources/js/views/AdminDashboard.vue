@@ -1679,11 +1679,23 @@
                 </div>
 
                 <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">N° de Vuelo</label>
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300">N° de Vuelo</label>
+                    <button 
+                      type="button" 
+                      @click="verifyFlightWithTransclick"
+                      :disabled="verifyingFlight || !broadcastForm.flight_number"
+                      class="text-[10px] text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                    >
+                      <Loader2 v-if="verifyingFlight" class="w-3 h-3 animate-spin" />
+                      <Search v-else class="w-3 h-3" />
+                      <span>Verificar en Transclick</span>
+                    </button>
+                  </div>
                   <input 
                     v-model="broadcastForm.flight_number"
                     type="text"
-                    placeholder="Ej. 716 o TM-716"
+                    placeholder="Ej. 708 o TM-708"
                     class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono uppercase focus:outline-none focus:border-sky-500"
                   />
                 </div>
@@ -1693,6 +1705,19 @@
                   <input 
                     v-model="broadcastForm.flight_date"
                     type="date"
+                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    <span>Hora de Salida / Reprogramación</span>
+                    <span class="text-[10px] text-sky-500 font-normal ml-1">(Editable Manual)</span>
+                  </label>
+                  <input 
+                    v-model="broadcastForm.flight_time"
+                    type="text"
+                    placeholder="Ej. 12:00, 19:00 o 15:30"
                     class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
                   />
                 </div>
@@ -1709,23 +1734,29 @@
                 </div>
 
                 <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Origen (Aeropuerto)</label>
+                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    <span>Origen</span>
+                    <span class="text-[10px] text-slate-400 font-normal ml-1">(Auto-detectado del manifiesto)</span>
+                  </label>
                   <select 
                     v-model="broadcastForm.origin"
                     class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                   >
-                    <option value="">Cualquier Origen</option>
+                    <option value="">Auto-detectar / Cualquier Origen</option>
                     <option v-for="ap in airportOptions" :key="ap.code" :value="ap.code">{{ ap.name }}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Destino (Aeropuerto)</label>
+                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    <span>Destino</span>
+                    <span class="text-[10px] text-slate-400 font-normal ml-1">(Auto-detectado del manifiesto)</span>
+                  </label>
                   <select 
                     v-model="broadcastForm.destination"
                     class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                   >
-                    <option value="">Cualquier Destino</option>
+                    <option value="">Auto-detectar / Cualquier Destino</option>
                     <option v-for="ap in airportOptions" :key="ap.code" :value="ap.code">{{ ap.name }}</option>
                   </select>
                 </div>
@@ -1840,7 +1871,7 @@
                 <!-- Botones de Selección Rápida de Plantilla -->
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                    Plantillas Oficiales (Solo Apellido Paterno + Mensaje):
+                    Plantillas Oficiales (Sr/Sra + Apellido Paterno + Mensaje):
                   </label>
                   <div class="grid grid-cols-2 gap-1.5 text-[11px]">
                     <button 
@@ -1857,7 +1888,7 @@
                       :class="broadcastForm.template_type === 'flight_delay' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
                       class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
                     >
-                      Demora (19:00)
+                      Demora / Reprog.
                     </button>
                     <button 
                       type="button" 
@@ -1987,15 +2018,28 @@
                 <p class="text-[11px] text-slate-500">Registro de auditoría y reportes de entrega celular</p>
               </div>
 
-              <button 
-                type="button" 
-                @click="fetchBroadcastCampaigns" 
-                :disabled="broadcastLoading"
-                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <RefreshCw class="w-3.5 h-3.5" :class="{'animate-spin': broadcastLoading}" />
-                <span>Actualizar Historial</span>
-              </button>
+              <div class="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  @click="triggerProcessQueue" 
+                  :disabled="processingQueue"
+                  class="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-xs text-white font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                >
+                  <Loader2 v-if="processingQueue" class="w-3.5 h-3.5 animate-spin" />
+                  <Send v-else class="w-3.5 h-3.5" />
+                  <span>{{ processingQueue ? 'Despachando...' : 'Procesar Cola SMS Ahora' }}</span>
+                </button>
+
+                <button 
+                  type="button" 
+                  @click="fetchBroadcastCampaigns" 
+                  :disabled="broadcastLoading"
+                  class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <RefreshCw class="w-3.5 h-3.5" :class="{'animate-spin': broadcastLoading}" />
+                  <span>Actualizar Historial</span>
+                </button>
+              </div>
             </div>
 
             <!-- Tabla de Campañas -->
@@ -3663,17 +3707,18 @@ const broadcastPreviewLoading = ref(false);
 const broadcastPreviewData = ref(null);
 
 const smsTemplates = {
-  eptam_cancellation: '{apellido}: EPTAM informa: El vuelo {vuelo} {origen}-{destino} de las {hora} fue cancelado. Para mayor informacion, comuniquese con nuestra oficina o espere nuevas instrucciones.',
-  flight_delay: '{apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue demorado para las 19:00. Consultas: WhatsApp 73748234 o 57075796.',
-  flight_cancellation: '{apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue cancelado por mantenimiento. Consultas: WhatsApp 73748234 o 57075796.',
-  flight_reminder: '{apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} se encuentra confirmado. Consultas: WhatsApp 73748234 o 57075796.',
-  custom: '{apellido}: TAMEP informa que ',
+  eptam_cancellation: 'Sr/Sra {apellido}: EPTAM informa: El vuelo {vuelo} {origen}-{destino} de las {hora} fue cancelado. Para mayor informacion, comuniquese con nuestra oficina o espere nuevas instrucciones.',
+  flight_delay: 'Sr/Sra {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue demorado para las {hora}. Consultas: WhatsApp 73748234 o 57075796.',
+  flight_cancellation: 'Sr/Sra {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue cancelado por mantenimiento. Consultas: WhatsApp 73748234 o 57075796.',
+  flight_reminder: 'Sr/Sra {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} se encuentra confirmado. Consultas: WhatsApp 73748234 o 57075796.',
+  custom: 'Sr/Sra {apellido}: TAMEP informa que ',
 };
 
 const broadcastForm = ref({
   title: 'Aviso de Vuelo EPTAM/TAMEP',
   flight_number: '',
   flight_date: '',
+  flight_time: '15:30',
   status: 'all',
   origin: '',
   destination: '',
@@ -3682,6 +3727,9 @@ const broadcastForm = ref({
   message: smsTemplates.eptam_cancellation,
   manifest_passengers: [],
 });
+
+const verifyingFlight = ref(false);
+const processingQueue = ref(false);
 
 const broadcastDetailModal = ref({
   isOpen: false,
@@ -3752,14 +3800,15 @@ const previewSimulatedMessage = computed(() => {
     dateStr = `${d}/${m}/${y}`;
   }
 
-  const timeStr = importedManifest.value?.departure_time || '23:20';
+  const timeStr = broadcastForm.value.flight_time || importedManifest.value?.departure_time || '15:30';
 
-  // Si incluye fórmula como "Estimado pasajero:", simplificarlo a solo el apellido paterno
-  text = text.replace(/^Estimad[oa]\s+pasajer[oa]\s*(\{apellido\})?:\s*/iu, '{apellido}: ');
+  // Normalizar fórmulas de saludo o prefijos al estándar "Sr/Sra {apellido}: "
+  text = text.replace(/^(?:Estimad[oa]\s+pasajer[oa]|Sr(?:@|\(a\))?\.?)\s*(\{apellido\})?:\s*/iu, 'Sr/Sra {apellido}: ');
+  text = text.replace(/^\{apellido(?:_paterno)?\}:\s*/iu, 'Sr/Sra {apellido}: ');
 
-  // Si no contiene ninguna variable de apellido/pasajero, anteponer el apellido paterno
+  // Si no contiene ninguna variable de apellido/pasajero ni prefijo, anteponer "Sr/Sra [Apellido]: "
   if (text && !/\{(?:apellido|apellido_paterno|pasajero|nombre)\}/i.test(text)) {
-    text = `${surname}: ${text}`;
+    text = `Sr/Sra ${surname}: ${text}`;
   }
 
   text = text.replace(/{apellido}|{apellido_paterno}/gi, surname);
@@ -3850,6 +3899,9 @@ function applyImportedManifest(manifest) {
   }
   if (manifest.destination) {
     broadcastForm.value.destination = manifest.destination;
+  }
+  if (manifest.departure_time) {
+    broadcastForm.value.flight_time = manifest.departure_time;
   }
 
   // Guardar lista de pasajeros en el formulario
@@ -3980,6 +4032,57 @@ async function retryFailedCampaign(campaign) {
     }
   } catch (e) {
     showToast(e.response?.data?.message || 'Error al reintentar fallidos.', 'error');
+  }
+}
+
+async function verifyFlightWithTransclick() {
+  if (!broadcastForm.value.flight_number) {
+    showToast('Ingrese un número de vuelo primero (ej: 708 o TM-708)', 'error');
+    return;
+  }
+  verifyingFlight.value = true;
+  try {
+    const res = await api.post('/admin/broadcasts/check-flight', {
+      flight_number: broadcastForm.value.flight_number,
+      flight_date: broadcastForm.value.flight_date || '',
+      origin: broadcastForm.value.origin || '',
+      destination: broadcastForm.value.destination || '',
+    });
+    if (res.data?.success && res.data.found && res.data.flight) {
+      if (res.data.origin) broadcastForm.value.origin = res.data.origin;
+      if (res.data.destination) broadcastForm.value.destination = res.data.destination;
+      if (res.data.departure_time) broadcastForm.value.flight_time = res.data.departure_time;
+      if (res.data.departure_date && !broadcastForm.value.flight_date) {
+        broadcastForm.value.flight_date = res.data.departure_date;
+      }
+
+      const routeStr = `${res.data.origin_city || res.data.origin} → ${res.data.destination_city || res.data.destination}`;
+      showToast(`Vuelo detectado en Transclick: ${routeStr} a las ${res.data.departure_time || 'N/A'}`);
+      fetchBroadcastPreview();
+    } else {
+      showToast(res.data?.message || 'No se encontró el vuelo en la programación de Transclick.', 'info');
+    }
+  } catch (e) {
+    console.error('Error al verificar vuelo con Transclick:', e);
+    showToast(e.response?.data?.message || 'Error al conectar con Transclick.', 'error');
+  } finally {
+    verifyingFlight.value = false;
+  }
+}
+
+async function triggerProcessQueue() {
+  processingQueue.value = true;
+  try {
+    const res = await api.post('/admin/broadcasts/process-queue');
+    if (res.data?.success) {
+      showToast(res.data.message || 'Cola de mensajes procesada.');
+      await fetchBroadcastCampaigns();
+    }
+  } catch (e) {
+    console.error('Error al procesar la cola SMS:', e);
+    showToast(e.response?.data?.message || 'Error al procesar la cola SMS.', 'error');
+  } finally {
+    processingQueue.value = false;
   }
 }
 
