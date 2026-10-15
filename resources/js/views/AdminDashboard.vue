@@ -1840,9 +1840,17 @@
                 <!-- Botones de Selección Rápida de Plantilla -->
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                    Plantillas Oficiales Recomendadas:
+                    Plantillas Oficiales (Solo Apellido Paterno + Mensaje):
                   </label>
                   <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <button 
+                      type="button" 
+                      @click="applySmsTemplate('eptam_cancellation')"
+                      :class="broadcastForm.template_type === 'eptam_cancellation' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
+                      class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
+                    >
+                      Cancelación EPTAM
+                    </button>
                     <button 
                       type="button" 
                       @click="applySmsTemplate('flight_delay')"
@@ -1858,14 +1866,6 @@
                       class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
                     >
                       Cancelación Mant.
-                    </button>
-                    <button 
-                      type="button" 
-                      @click="applySmsTemplate('eptam_cancellation')"
-                      :class="broadcastForm.template_type === 'eptam_cancellation' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
-                      class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
-                    >
-                      Cancelación EPTAM
                     </button>
                     <button 
                       type="button" 
@@ -3663,12 +3663,36 @@ const broadcastPreviewLoading = ref(false);
 const broadcastPreviewData = ref(null);
 
 const smsTemplates = {
-  flight_delay: 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue demorado para las 19:00. Consultas: WhatsApp 73748234 o 57075796.',
-  flight_cancellation: 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue cancelado por mantenimiento. Consultas: WhatsApp 73748234 o 57075796.',
-  eptam_cancellation: 'EPTAM informa: El vuelo {vuelo} {origen}-{destino} de las {hora} fue cancelado. Para mayor informacion, comuniquese con nuestra oficina o espere nuevas instrucciones.',
-  flight_reminder: 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} se encuentra confirmado. Consultas: WhatsApp 73748234 o 57075796.',
-  custom: 'Estimado pasajero {apellido}: TAMEP informa que ',
+  eptam_cancellation: '{apellido}: EPTAM informa: El vuelo {vuelo} {origen}-{destino} de las {hora} fue cancelado. Para mayor informacion, comuniquese con nuestra oficina o espere nuevas instrucciones.',
+  flight_delay: '{apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue demorado para las 19:00. Consultas: WhatsApp 73748234 o 57075796.',
+  flight_cancellation: '{apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} fue cancelado por mantenimiento. Consultas: WhatsApp 73748234 o 57075796.',
+  flight_reminder: '{apellido}: TAMEP informa que su vuelo {vuelo} {origen}-{destino} del {fecha} se encuentra confirmado. Consultas: WhatsApp 73748234 o 57075796.',
+  custom: '{apellido}: TAMEP informa que ',
 };
+
+const broadcastForm = ref({
+  title: 'Aviso de Vuelo EPTAM/TAMEP',
+  flight_number: '',
+  flight_date: '',
+  status: 'all',
+  origin: '',
+  destination: '',
+  manual_phones: '',
+  template_type: 'eptam_cancellation',
+  message: smsTemplates.eptam_cancellation,
+  manifest_passengers: [],
+});
+
+const broadcastDetailModal = ref({
+  isOpen: false,
+  loading: false,
+  campaign: null,
+  recipients: [],
+});
+
+const importedManifest = ref(null);
+const showManifestTable = ref(false);
+const manifestLoading = ref(false);
 
 const airportCityNames = {
   VVI: 'Santa Cruz',
@@ -3730,17 +3754,42 @@ const previewSimulatedMessage = computed(() => {
 
   const timeStr = importedManifest.value?.departure_time || '23:20';
 
+  // Si incluye fórmula como "Estimado pasajero:", simplificarlo a solo el apellido paterno
+  text = text.replace(/^Estimad[oa]\s+pasajer[oa]\s*(\{apellido\})?:\s*/iu, '{apellido}: ');
+
+  // Si no contiene ninguna variable de apellido/pasajero, anteponer el apellido paterno
+  if (text && !/\{(?:apellido|apellido_paterno|pasajero|nombre)\}/i.test(text)) {
+    text = `${surname}: ${text}`;
+  }
+
   text = text.replace(/{apellido}|{apellido_paterno}/gi, surname);
-  text = text.replace(/{pasajero}|{nombre}/gi, pax.passenger_name || 'CALLIZAYA ANTONIO VICTOR HUGO');
+  text = text.replace(/{pasajero}|{nombre}/gi, surname); // Solo apellido paterno, nunca nombre completo
   text = text.replace(/{vuelo}/gi, broadcastForm.value.flight_number || pax.flight_number || '708');
   text = text.replace(/{fecha}/gi, dateStr);
   text = text.replace(/{hora}/gi, timeStr);
   text = text.replace(/{origen}/gi, origCity);
   text = text.replace(/{destino}/gi, destCity);
-  text = text.replace(/{ruta}/gi, `${origCity}-${destCity}`);
+  text = text.replace(/{ruta}/gi, (origCity && destCity) ? `${origCity}-${destCity}` : '');
   text = text.replace(/{pnr}/gi, pax.booking_reference || pax.pnr || 'UUA84U');
 
   return text;
+});
+
+const smsCharCount = computed(() => {
+  return (previewSimulatedMessage.value || broadcastForm.value.message || '').length;
+});
+
+const smsSegmentCount = computed(() => {
+  const len = smsCharCount.value;
+  if (len === 0) return 1;
+  if (len <= 160) return 1;
+  return Math.ceil(len / 153);
+});
+
+const smsCostClass = computed(() => {
+  if (smsCharCount.value <= 160) return 'text-emerald-600 dark:text-emerald-400';
+  if (smsCharCount.value <= 306) return 'text-amber-600 dark:text-amber-400';
+  return 'text-red-500';
 });
 
 async function loadDefaultManifestPdf() {

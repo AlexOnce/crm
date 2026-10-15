@@ -216,4 +216,58 @@ class MassBroadcastSmsTest extends TestCase
                 ],
             ]);
     }
+
+    public function test_message_personalization_sends_only_paternal_surname_and_predefined_message(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        // 1. Mensaje predefinido sin placeholder explícito: debe anteponer el apellido paterno
+        $response1 = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/preview', [
+                'message' => 'EPTAM informa: El vuelo 302 La Paz-Santa Cruz de las 15:30 fue cancelado. Para mayor informacion, comuniquese con nuestra oficina o espere nuevas instrucciones.',
+                'manual_phones' => '73748234',
+                'manifest_passengers' => [
+                    [
+                        'passenger_name' => 'CALLIZAYA ANTONIO VICTOR HUGO',
+                        'paternal_surname' => 'CALLIZAYA',
+                        'phone' => '73748234',
+                        'origin' => 'VVI',
+                        'destination' => 'LPB',
+                        'flight_number' => '302',
+                    ],
+                ],
+            ]);
+
+        $response1->assertStatus(200);
+        $sampleMsg1 = $response1->json('sample_message');
+        $this->assertStringStartsWith('CALLIZAYA: EPTAM informa:', $sampleMsg1);
+        $this->assertStringNotContainsString('ANTONIO', $sampleMsg1);
+        $this->assertStringNotContainsString('VICTOR', $sampleMsg1);
+        $this->assertStringNotContainsString('HUGO', $sampleMsg1);
+
+        // 2. Mensaje con fórmula 'Estimado pasajero {apellido}:' debe simplificarse a solo apellido paterno
+        $response2 = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/preview', [
+                'message' => 'Estimado pasajero {apellido}: TAMEP informa que su vuelo {vuelo} fue cancelado por mantenimiento.',
+                'manual_phones' => '73748234',
+                'manifest_passengers' => [
+                    [
+                        'passenger_name' => 'MENDOZA QUISPE JUAN',
+                        'paternal_surname' => 'MENDOZA',
+                        'phone' => '73748234',
+                        'flight_number' => '702',
+                    ],
+                ],
+            ]);
+
+        $response2->assertStatus(200);
+        $sampleMsg2 = $response2->json('sample_message');
+        $this->assertEquals('MENDOZA: TAMEP informa que su vuelo 702 fue cancelado por mantenimiento.', $sampleMsg2);
+        $this->assertStringNotContainsString('Estimado pasajero', $sampleMsg2);
+        $this->assertStringNotContainsString('QUISPE', $sampleMsg2);
+    }
 }

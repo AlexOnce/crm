@@ -72,7 +72,8 @@ class MassBroadcastController extends Controller
                 if (strlen($clean) >= 8) {
                     $manualList[] = [
                         'id' => null,
-                        'passenger_name' => 'Destinatario Manual',
+                        'passenger_name' => 'Pasajero',
+                        'paternal_surname' => 'Pasajero',
                         'phone' => $clean,
                         'flight_number' => $validated['flight_number'] ?? 'N/A',
                         'flight_date' => $validated['flight_date'] ?? null,
@@ -89,6 +90,29 @@ class MassBroadcastController extends Controller
         $seenPhones = [];
         $uniquePassengers = [];
 
+        // Prioridad 1: Pasajeros del Manifiesto PDF (nombres y apellidos reales)
+        if (! empty($validated['manifest_passengers'])) {
+            foreach ($validated['manifest_passengers'] as $pax) {
+                $cleanPhone = preg_replace('/\D/', '', (string) ($pax['phone'] ?? ''));
+                if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
+                    $seenPhones[$cleanPhone] = true;
+                    $uniquePassengers[] = [
+                        'id' => null,
+                        'passenger_name' => $pax['passenger_name'] ?? 'Pasajero',
+                        'paternal_surname' => $pax['paternal_surname'] ?? null,
+                        'phone' => $cleanPhone,
+                        'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
+                        'flight_date' => $validated['flight_date'] ?? null,
+                        'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
+                        'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
+                        'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
+                        'status' => 'manifest_pdf',
+                    ];
+                }
+            }
+        }
+
+        // Prioridad 2: Pasajeros de la base de datos CRM
         foreach ($leads as $lead) {
             $cleanPhone = preg_replace('/\D/', '', $lead->phone);
             if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
@@ -96,6 +120,7 @@ class MassBroadcastController extends Controller
                 $uniquePassengers[] = [
                     'id' => $lead->id,
                     'passenger_name' => $lead->passenger_name ?: 'Pasajero',
+                    'paternal_surname' => $this->extractPaternalSurname($lead->passenger_name),
                     'phone' => $cleanPhone,
                     'flight_number' => $lead->flight_number,
                     'flight_date' => $lead->flight_date?->format('Y-m-d') ?: (string) $lead->flight_date,
@@ -107,31 +132,11 @@ class MassBroadcastController extends Controller
             }
         }
 
+        // Prioridad 3: Números manuales adicionales
         foreach ($manualList as $man) {
             if (! isset($seenPhones[$man['phone']])) {
                 $seenPhones[$man['phone']] = true;
                 $uniquePassengers[] = $man;
-            }
-        }
-
-        // 4. Incorporar pasajeros procedentes del Manifiesto PDF si fueron cargados
-        if (! empty($validated['manifest_passengers'])) {
-            foreach ($validated['manifest_passengers'] as $pax) {
-                $cleanPhone = preg_replace('/\D/', '', (string) ($pax['phone'] ?? ''));
-                if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
-                    $seenPhones[$cleanPhone] = true;
-                    $uniquePassengers[] = [
-                        'id' => null,
-                        'passenger_name' => $pax['passenger_name'] ?? 'Pasajero',
-                        'phone' => $cleanPhone,
-                        'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
-                        'flight_date' => $validated['flight_date'] ?? null,
-                        'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
-                        'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
-                        'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
-                        'status' => 'manifest_pdf',
-                    ];
-                }
             }
         }
 
@@ -217,12 +222,47 @@ class MassBroadcastController extends Controller
             $seenPhones = [];
             $recipientsData = [];
 
+            // 1. Destinatarios del Manifiesto PDF (nombres y apellidos reales)
+            if (! empty($validated['manifest_passengers'])) {
+                foreach ($validated['manifest_passengers'] as $pax) {
+                    $cleanPhone = preg_replace('/\D/', '', (string) ($pax['phone'] ?? ''));
+                    if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
+                        $seenPhones[$cleanPhone] = true;
+                        $paxInfo = [
+                            'passenger_name' => $pax['passenger_name'] ?? 'Pasajero',
+                            'paternal_surname' => $pax['paternal_surname'] ?? null,
+                            'phone' => $cleanPhone,
+                            'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
+                            'flight_date' => $validated['flight_date'] ?? '',
+                            'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
+                            'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
+                            'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
+                        ];
+
+                        $personalized = $this->personalizeMessage($validated['message'], $paxInfo);
+
+                        $recipientsData[] = [
+                            'lead_id' => null,
+                            'phone' => $cleanPhone,
+                            'passenger_name' => $paxInfo['passenger_name'],
+                            'flight_number' => $paxInfo['flight_number'],
+                            'message' => $personalized,
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    }
+                }
+            }
+
+            // 2. Destinatarios de la base de datos CRM
             foreach ($leads as $lead) {
                 $cleanPhone = preg_replace('/\D/', '', $lead->phone);
                 if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
                     $seenPhones[$cleanPhone] = true;
                     $leadInfo = [
                         'passenger_name' => $lead->passenger_name ?: 'Pasajero',
+                        'paternal_surname' => $this->extractPaternalSurname($lead->passenger_name),
                         'phone' => $cleanPhone,
                         'flight_number' => $lead->flight_number ?: '',
                         'flight_date' => $lead->flight_date?->format('d/m/Y') ?: '',
@@ -246,7 +286,7 @@ class MassBroadcastController extends Controller
                 }
             }
 
-            // Añadir números manuales si existen
+            // 3. Destinatarios añadidos por números manuales adicionales
             if (! empty($validated['manual_phones'])) {
                 $rawPhones = preg_split('/[\r\n,;]+/', $validated['manual_phones']);
                 foreach ($rawPhones as $raw) {
@@ -255,6 +295,7 @@ class MassBroadcastController extends Controller
                         $seenPhones[$cleanPhone] = true;
                         $manualInfo = [
                             'passenger_name' => 'Pasajero',
+                            'paternal_surname' => 'Pasajero',
                             'phone' => $cleanPhone,
                             'flight_number' => $validated['flight_number'] ?? '',
                             'flight_date' => $validated['flight_date'] ?? '',
@@ -270,38 +311,6 @@ class MassBroadcastController extends Controller
                             'phone' => $cleanPhone,
                             'passenger_name' => null,
                             'flight_number' => $validated['flight_number'] ?? null,
-                            'message' => $personalized,
-                            'status' => 'pending',
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ];
-                    }
-                }
-            }
-
-            // 3. Destinatarios del Manifiesto PDF
-            if (! empty($validated['manifest_passengers'])) {
-                foreach ($validated['manifest_passengers'] as $pax) {
-                    $cleanPhone = preg_replace('/\D/', '', (string) ($pax['phone'] ?? ''));
-                    if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
-                        $seenPhones[$cleanPhone] = true;
-                        $paxInfo = [
-                            'passenger_name' => $pax['passenger_name'] ?? 'Pasajero',
-                            'phone' => $cleanPhone,
-                            'flight_number' => $pax['flight_number'] ?? ($validated['flight_number'] ?? ''),
-                            'flight_date' => $validated['flight_date'] ?? '',
-                            'origin' => $pax['origin'] ?? ($validated['origin'] ?? ''),
-                            'destination' => $pax['destination'] ?? ($validated['destination'] ?? ''),
-                            'booking_reference' => $pax['pnr'] ?? ($pax['booking_reference'] ?? ''),
-                        ];
-
-                        $personalized = $this->personalizeMessage($validated['message'], $paxInfo);
-
-                        $recipientsData[] = [
-                            'lead_id' => null,
-                            'phone' => $cleanPhone,
-                            'passenger_name' => $paxInfo['passenger_name'],
-                            'flight_number' => $paxInfo['flight_number'],
                             'message' => $personalized,
                             'status' => 'pending',
                             'created_at' => now(),
@@ -431,6 +440,7 @@ class MassBroadcastController extends Controller
 
     /**
      * Personaliza las etiquetas dinámicas dentro de una plantilla.
+     * En mensajería masiva SMS GoIP se envía solo el apellido paterno y el mensaje predefinido.
      */
     protected function personalizeMessage(string $template, array $data): string
     {
@@ -447,17 +457,29 @@ class MassBroadcastController extends Controller
             $flightDate = "{$m[3]}/{$m[2]}/{$m[1]}";
         }
 
+        // Si la plantilla incluye "Estimado pasajero:", simplificarlo a solo el apellido paterno
+        $trimmed = trim($template);
+        $cleaned = preg_replace('/^Estimad[oa]\s+pasajer[oa]\s*(\{apellido\})?:\s*/iu', '{apellido}: ', $trimmed);
+        if ($cleaned !== null && $cleaned !== $trimmed) {
+            $template = $cleaned;
+        }
+
+        // Si la plantilla no contiene ninguna variable de apellido/pasajero, anteponer el apellido paterno
+        if (! preg_match('/\{(?:apellido|apellido_paterno|pasajero|nombre)\}/i', $template)) {
+            $template = "{$paternalSurname}: {$template}";
+        }
+
         $replacements = [
             '{apellido}' => $paternalSurname,
             '{apellido_paterno}' => $paternalSurname,
-            '{pasajero}' => $fullName,
-            '{nombre}' => $fullName,
+            '{pasajero}' => $paternalSurname, // Solo enviar apellido paterno, nunca nombre completo
+            '{nombre}' => $paternalSurname,
             '{vuelo}' => $flightNumber,
             '{fecha}' => $flightDate,
             '{hora}' => $flightTime,
             '{origen}' => $originCity,
             '{destino}' => $destinationCity,
-            '{ruta}' => "{$originCity}-{$destinationCity}",
+            '{ruta}' => ($originCity && $destinationCity) ? "{$originCity}-{$destinationCity}" : '',
             '{pnr}' => $data['booking_reference'] ?? ($data['pnr'] ?? ''),
         ];
 
