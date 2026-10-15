@@ -357,4 +357,106 @@ class MassBroadcastSmsTest extends TestCase
                 'destination' => 'LPB',
             ]);
     }
+
+    public function test_admin_can_search_flights_by_date_only_without_origin_and_destination(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $mockFlightService = $this->createMock(FlightMicroservice::class);
+        $mockFlightService->method('searchRoutesParallel')->willReturn([
+            [
+                'flight_number' => 'TM-706',
+                'departure_time' => '15:40',
+                'departure_date' => '2026-10-15',
+                'origin' => 'VVI',
+                'destination' => 'CBB',
+                'origin_city' => 'Santa Cruz',
+                'destination_city' => 'Cochabamba',
+                'status' => 'Programado',
+            ],
+            [
+                'flight_number' => 'TM-708',
+                'departure_time' => '19:00',
+                'departure_date' => '2026-10-15',
+                'origin' => 'VVI',
+                'destination' => 'LPB',
+                'origin_city' => 'Santa Cruz',
+                'destination_city' => 'La Paz',
+                'status' => 'Programado',
+            ],
+        ]);
+        $this->app->instance(FlightMicroservice::class, $mockFlightService);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/check-flight', [
+                'flight_date' => '2026-10-15',
+                'origin' => '',
+                'destination' => '',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'found' => true,
+            ]);
+
+        $this->assertCount(2, $response->json('flights'));
+    }
+
+    public function test_admin_can_filter_broadcast_campaigns_by_flight_and_date(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $c1 = BroadcastCampaign::create([
+            'user_id' => $admin->id,
+            'title' => 'Aviso Vuelo TM-708 - 15/10/2026',
+            'channel' => 'sms',
+            'template_type' => 'flight_delay',
+            'message' => 'Test message',
+            'filters' => [
+                'flight_number' => '708',
+                'flight_date' => '2026-10-15',
+            ],
+            'total_recipients' => 10,
+            'status' => 'completed',
+        ]);
+
+        $c2 = BroadcastCampaign::create([
+            'user_id' => $admin->id,
+            'title' => 'Aviso Vuelo TM-702 - 16/10/2026',
+            'channel' => 'sms',
+            'template_type' => 'flight_cancellation',
+            'message' => 'Other flight message',
+            'filters' => [
+                'flight_number' => '702',
+                'flight_date' => '2026-10-16',
+            ],
+            'total_recipients' => 5,
+            'status' => 'completed',
+        ]);
+
+        // Filtrar por vuelo 708
+        $resFlight = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/admin/broadcasts?flight_number=708');
+
+        $resFlight->assertStatus(200);
+        $this->assertCount(1, $resFlight->json('campaigns.data'));
+        $this->assertEquals($c1->id, $resFlight->json('campaigns.data.0.id'));
+
+        // Filtrar por fecha 2026-10-16
+        $resDate = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/admin/broadcasts?date=2026-10-16');
+
+        $resDate->assertStatus(200);
+        $this->assertCount(1, $resDate->json('campaigns.data'));
+        $this->assertEquals($c2->id, $resDate->json('campaigns.data.0.id'));
+    }
 }

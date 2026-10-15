@@ -1497,275 +1497,385 @@
              ======================================================== -->
         <div v-if="activeTab === 'broadcasts'" class="space-y-6">
           
-          <!-- Encabezado de Estado del Hardware GoIP -->
-          <div class="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <!-- Encabezado Limpio -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
-                  <Radio class="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Avisos de Vuelo por SMS (Gateway GoIP)</span>
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Chip Entel (Línea 1)
-                    </span>
-                  </h2>
-                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Emisión masiva de alertas a pasajeros (demoras, cancelaciones y reprogramaciones) mediante el hardware GoIP en segundo plano.
-                  </p>
-                </div>
-              </div>
+              <h2 class="text-base font-bold text-slate-900 dark:text-white">
+                Avisos de Vuelo por SMS
+              </h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Envío masivo a pasajeros ante demoras o cancelaciones (Gateway GoIP)
+              </p>
             </div>
-
-            <!-- Badges Técnicos Informativos -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <div class="px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5 font-mono">
-                <Clock class="w-3.5 h-3.5 text-sky-500" />
-                <span>Pausa Anti-Spam: 15s</span>
-              </div>
-              <div class="px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5 font-mono">
-                <ShieldCheck class="w-3.5 h-3.5 text-emerald-500" />
-                <span>Filtro GSM-7 Activo</span>
-              </div>
+            <div class="flex items-center gap-2">
+              <button 
+                type="button" 
+                @click="triggerProcessQueue" 
+                :disabled="processingQueue"
+                class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Loader2 v-if="processingQueue" class="w-3.5 h-3.5 animate-spin" />
+                <span>{{ processingQueue ? 'Despachando...' : 'Procesar Cola SMS' }}</span>
+              </button>
+              <button 
+                type="button" 
+                @click="fetchBroadcastCampaigns" 
+                :disabled="broadcastLoading"
+                class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 transition cursor-pointer"
+              >
+                Actualizar
+              </button>
             </div>
           </div>
 
           <!-- Formulario de Configuración y Emisión -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            
             <!-- Columna Izquierda: Filtros de Pasajeros y Datos del Vuelo (7 cols) -->
             <div class="lg:col-span-7 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
+              <!-- Encabezado de Sección -->
               <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                  <Plane class="w-4 h-4 text-sky-500" />
-                  <span>1. Seleccionar Pasajeros / Vuelo</span>
+                <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  1. Buscar Vuelo Afectado
                 </h3>
-                <span class="text-[11px] text-slate-400">Filtrado local o importación PDF</span>
-              </div>
+                 </div>
 
-              <!-- Panel de Importación de Manifiesto PDF Oficial (/documentos/vuelo.pdf) -->
-              <div class="p-4 rounded-xl border border-sky-500/20 bg-sky-50/50 dark:bg-sky-950/20 space-y-3">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
-                      <FileText class="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <span>Cargar Manifiesto de Vuelo (PDF)</span>
-                        <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30">
-                          Recomendado
-                        </span>
-                      </h4>
-                      <p class="text-[11px] text-slate-500">
-                        Extrae vuelo, ruta, fecha y celulares de los pasajeros desde el reporte PDF.
-                      </p>
-                    </div>
+              <!-- Bloque Principal de Búsqueda de Vuelo -->
+              <div class="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                  <div class="sm:col-span-3">
+                    <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Origen
+                    </label>
+                    <select 
+                      v-model="broadcastForm.origin"
+                      @change="onFlightDateOrRouteChange"
+                      class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                    >
+                      <option value="">(Todos los orígenes)</option>
+                      <option v-for="apt in broadcastAirports" :key="apt.code" :value="apt.code">
+                        {{ apt.city }} ({{ apt.code }})
+                      </option>
+                    </select>
                   </div>
 
-                  <div class="flex items-center gap-2">
-                    <!-- Botón directo para el archivo cargado en /documentos/vuelo.pdf -->
-                    <button 
-                      type="button" 
-                      @click="loadDefaultManifestPdf"
-                      :disabled="manifestLoading"
-                      class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
-                      title="Cargar el archivo /documentos/vuelo.pdf del servidor"
+                  <div class="sm:col-span-3">
+                    <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Destino
+                    </label>
+                    <select 
+                      v-model="broadcastForm.destination"
+                      @change="onFlightDateOrRouteChange"
+                      class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                     >
-                      <Loader2 v-if="manifestLoading" class="w-3.5 h-3.5 animate-spin" />
-                      <Download v-else class="w-3.5 h-3.5" />
-                      <span>Cargar /documentos/vuelo.pdf</span>
-                    </button>
+                      <option value="">(Todos los destinos)</option>
+                      <option v-for="apt in broadcastAirports" :key="apt.code" :value="apt.code">
+                        {{ apt.city }} ({{ apt.code }})
+                      </option>
+                    </select>
+                  </div>
 
-                    <!-- Input oculto para subir otro PDF si se desea -->
+                  <div class="sm:col-span-3">
+                    <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Fecha del Vuelo *
+                    </label>
                     <input 
-                      type="file" 
-                      ref="manifestFileInput" 
-                      accept=".pdf" 
-                      class="hidden" 
-                      @change="handleManifestFileUpload" 
+                      v-model="broadcastForm.flight_date"
+                      type="date"
+                      @change="onFlightDateOrRouteChange"
+                      class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                     />
-                    <button 
-                      type="button" 
-                      @click="$refs.manifestFileInput.click()"
-                      :disabled="manifestLoading"
-                      class="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
-                      title="Seleccionar otro archivo PDF de la computadora"
-                    >
-                      <Upload class="w-3.5 h-3.5" />
-                      <span>Subir PDF</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Banner Informativo cuando un Manifiesto está Activo -->
-                <div v-if="importedManifest" class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 space-y-2">
-                  <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
-                    <div class="flex items-center gap-2 font-mono">
-                      <span class="px-2 py-0.5 rounded font-extrabold bg-emerald-600 text-white text-[11px]">
-                        VUELO {{ importedManifest.flight_number }}
-                      </span>
-                      <span class="font-bold text-slate-900 dark:text-white">
-                        {{ importedManifest.origin }} → {{ importedManifest.destination }}
-                      </span>
-                      <span class="text-slate-500 text-[11px]">
-                        ({{ importedManifest.departure_date_raw }} {{ importedManifest.departure_time }})
-                      </span>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                      <span class="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                        {{ importedManifest.valid_phones_count }} Pasajeros con Celular
-                      </span>
-                      <button 
-                        type="button" 
-                        @click="showManifestTable = !showManifestTable"
-                        class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
-                      >
-                        {{ showManifestTable ? 'Ocultar lista' : 'Ver lista detallada' }}
-                      </button>
-                      <button 
-                        type="button" 
-                        @click="clearImportedManifest"
-                        class="p-1 rounded text-slate-400 hover:text-red-500 transition cursor-pointer"
-                        title="Quitar manifiesto"
-                      >
-                        <X class="w-3.5 h-3.5" />
-                      </button>
-                    </div>
                   </div>
 
-                  <!-- Mini tabla desplegable de pasajeros del PDF -->
-                  <div v-if="showManifestTable" class="max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px]">
-                    <table class="w-full text-left">
-                      <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 font-semibold sticky top-0">
-                        <tr>
-                          <th class="p-1.5">N°</th>
-                          <th class="p-1.5">PNR</th>
-                          <th class="p-1.5">Pasajero</th>
-                          <th class="p-1.5">DNI</th>
-                          <th class="p-1.5">Celular (GoIP)</th>
-                          <th class="p-1.5">Tarifa</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                        <tr v-for="pax in importedManifest.passengers" :key="pax.num" class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                          <td class="p-1.5 text-slate-400">{{ pax.num }}</td>
-                          <td class="p-1.5 font-bold text-sky-600 dark:text-sky-400">{{ pax.pnr }}</td>
-                          <td class="p-1.5 font-sans font-semibold text-slate-900 dark:text-white">{{ pax.passenger_name }}</td>
-                          <td class="p-1.5">{{ pax.dni || '-' }}</td>
-                          <td class="p-1.5 text-emerald-600 dark:text-emerald-400 font-bold">{{ pax.phone }}</td>
-                          <td class="p-1.5 text-[10px] text-slate-500">{{ pax.tarifa }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Filtros en Grid -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Título del Aviso *</label>
-                  <input 
-                    v-model="broadcastForm.title"
-                    type="text"
-                    required
-                    placeholder="Ej. Demora Vuelo 716 a La Paz"
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-
-                <div>
-                  <div class="flex items-center justify-between mb-1">
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300">N° de Vuelo</label>
+                  <div class="sm:col-span-3">
                     <button 
                       type="button" 
                       @click="verifyFlightWithTransclick"
-                      :disabled="verifyingFlight || !broadcastForm.flight_number"
-                      class="text-[10px] text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                      :disabled="verifyingFlight || !broadcastForm.flight_date"
+                      class="w-full py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                     >
-                      <Loader2 v-if="verifyingFlight" class="w-3 h-3 animate-spin" />
-                      <Search v-else class="w-3 h-3" />
-                      <span>Verificar en Transclick</span>
+                      <Loader2 v-if="verifyingFlight" class="w-3.5 h-3.5 animate-spin" />
+                      <span>{{ verifyingFlight ? 'Buscando...' : 'Buscar Vuelos' }}</span>
                     </button>
                   </div>
-                  <input 
-                    v-model="broadcastForm.flight_number"
-                    type="text"
-                    placeholder="Ej. 708 o TM-708"
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono uppercase focus:outline-none focus:border-sky-500"
-                  />
                 </div>
 
-                <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Fecha del Vuelo</label>
-                  <input 
-                    v-model="broadcastForm.flight_date"
-                    type="date"
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
-                  />
+                <!-- Lista de Vuelos Disponibles para Seleccionar -->
+                <div v-if="availableFlightsList.length" class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-sky-500/30 space-y-2">
+                  <div class="flex items-center justify-between text-xs pb-1 border-b border-slate-100 dark:border-slate-800">
+                    <span class="font-bold text-slate-900 dark:text-white">
+                      Vuelos disponibles en Transclick ({{ availableFlightsList.length }}):
+                    </span>
+                    <span class="text-[10px] text-slate-400">Selecciona el vuelo afectado</span>
+                  </div>
+
+                  <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                    <div 
+                      v-for="fl in availableFlightsList" 
+                      :key="fl.flight_number + fl.departure_time"
+                      class="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-sky-500/50 hover:bg-sky-50/40 dark:hover:bg-sky-950/20 flex items-center justify-between flex-wrap gap-2 transition"
+                    >
+                      <div class="flex items-center gap-2 text-xs font-mono">
+                        <span class="px-2 py-0.5 rounded font-bold bg-sky-600 text-white text-[11px]">
+                          {{ fl.flight_number }}
+                        </span>
+                        <span class="font-bold text-slate-900 dark:text-white">
+                          {{ fl.origin_city || fl.origin }} → {{ fl.destination_city || fl.destination }}
+                        </span>
+                        <span class="text-slate-500 text-[11px]">
+                          Salida: {{ fl.departure_time }} (Llegada: {{ fl.arrival_time || 'N/A' }})
+                        </span>
+                      </div>
+
+                      <button 
+                        type="button" 
+                        @click="selectAvailableFlight(fl)"
+                        :class="isFlightSelected(fl) ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                        class="px-3 py-1 rounded-md text-xs font-bold transition cursor-pointer"
+                      >
+                        {{ isFlightSelected(fl) ? '✓ Seleccionado' : 'Seleccionar' }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    <span>Hora de Salida / Reprogramación</span>
-                    <span class="text-[10px] text-sky-500 font-normal ml-1">(Editable Manual)</span>
+                <!-- Carga de Manifiesto Oficial de Pasajeros (PDF) -->
+                <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <FileText class="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                      <span>Manifiesto de Pasajeros de Vuelo (PDF)</span>
+                    </span>
+                  </div>
+
+                  <input 
+                    type="file" 
+                    ref="manifestFileInput" 
+                    accept=".pdf" 
+                    class="hidden" 
+                    @change="handleManifestFileUpload" 
+                  />
+
+                  <!-- Estado Normal: Botón Prominente con Drag & Drop -->
+                  <div 
+                    v-if="!importedManifest"
+                    @dragover.prevent="isDraggingManifest = true"
+                    @dragleave.prevent="isDraggingManifest = false"
+                    @drop.prevent="handleFileDrop"
+                    @click="$refs.manifestFileInput.click()"
+                    :class="[
+                      isDraggingManifest 
+                        ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/40 ring-2 ring-sky-500/50' 
+                        : 'border-slate-300 dark:border-slate-700 hover:border-sky-500 dark:hover:border-sky-400 bg-gradient-to-r from-sky-50/60 via-slate-50 to-indigo-50/40 dark:from-slate-900/60 dark:via-slate-900/40 dark:to-indigo-950/20 hover:bg-sky-50/70',
+                      manifestLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                    ]"
+                    class="p-3.5 rounded-xl border-2 border-dashed transition flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <Loader2 v-if="manifestLoading" class="w-4 h-4 animate-spin" />
+                        <Upload v-else class="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div class="text-xs font-bold text-slate-900 dark:text-white">
+                          {{ manifestLoading ? 'Procesando archivo PDF y extrayendo celulares...' : 'Cargar Manifiesto de Pasajeros en PDF' }}
+                        </div>
+                        <div class="text-[11px] text-slate-500 dark:text-slate-400">
+                          Selecciona el archivo o arrastra el PDF de vuelo aquí para cargar los pasajeros
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      :disabled="manifestLoading"
+                      class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-sm transition shrink-0 pointer-events-none"
+                    >
+                      <span>Seleccionar PDF</span>
+                    </button>
+                  </div>
+
+                  <!-- Estado Activo: Manifiesto Cargado con Detalles Claros -->
+                  <div 
+                    v-else
+                    class="p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/30 space-y-2.5"
+                  >
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                      <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-xs">
+                          ✓
+                        </div>
+                        <div>
+                          <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span>Manifiesto PDF Cargado con Éxito</span>
+                            <span v-if="importedManifest.flight_number" class="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold">
+                              VUELO {{ importedManifest.flight_number }}
+                            </span>
+                          </div>
+                          <div class="text-[11px] text-slate-600 dark:text-slate-400 font-mono">
+                            {{ importedManifest.total_passengers }} Pasajeros totales • <strong class="text-emerald-600 dark:text-emerald-400 font-bold">{{ importedManifest.valid_phones_count }} teléfonos bolivianos</strong> listos para SMS
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <button 
+                          type="button" 
+                          @click="showManifestTable = !showManifestTable"
+                          class="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          {{ showManifestTable ? 'Ocultar pasajeros' : 'Ver pasajeros' }}
+                        </button>
+                        <button 
+                          type="button" 
+                          @click="$refs.manifestFileInput.click()"
+                          :disabled="manifestLoading"
+                          class="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          Reemplazar
+                        </button>
+                        <button 
+                          type="button" 
+                          @click="clearImportedManifest"
+                          class="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+                        >
+                          ✕ Quitar PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Ficha Informativa del Vuelo Detectado (Transclick o PDF) -->
+              <div v-if="flightDetectedInfo" class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center gap-2 font-mono text-xs">
+                    <span class="px-2 py-0.5 rounded font-bold bg-emerald-600 text-white text-[11px]">
+                      VUELO {{ flightDetectedInfo.flight_number }}
+                    </span>
+                    <span class="font-bold text-slate-900 dark:text-white">
+                      {{ flightDetectedInfo.origin_city || flightDetectedInfo.origin }} → {{ flightDetectedInfo.destination_city || flightDetectedInfo.destination }}
+                    </span>
+                    <span class="text-slate-500 text-[11px]">
+                      ({{ flightDetectedInfo.departure_date || flightDetectedInfo.departure_date_raw }} - {{ flightDetectedInfo.departure_time }})
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <span v-if="importedManifest" class="font-bold text-slate-700 dark:text-slate-300 text-xs">
+                      {{ importedManifest.total_passengers }} Pasajeros PDF ({{ importedManifest.valid_phones_count }} Celulares)
+                    </span>
+                    <span v-else-if="broadcastPreviewData" class="font-bold text-slate-700 dark:text-slate-300 text-xs">
+                      {{ broadcastPreviewData.total_recipients }} Pasajeros CRM
+                    </span>
+                    <button 
+                      type="button" 
+                      @click="clearFlightDetected"
+                      class="px-1.5 py-0.5 text-xs text-slate-400 hover:text-red-500 transition cursor-pointer"
+                      title="Limpiar datos de vuelo"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Mini tabla desplegable de pasajeros si vino de PDF -->
+                <div v-if="showManifestTable && importedManifest?.passengers?.length" class="max-h-48 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px]">
+                  <table class="w-full text-left">
+                    <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 font-semibold sticky top-0">
+                      <tr>
+                        <th class="p-1.5">N°</th>
+                        <th class="p-1.5">PNR</th>
+                        <th class="p-1.5">Pasajero</th>
+                        <th class="p-1.5">Celular (GoIP)</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                      <tr v-for="pax in importedManifest.passengers" :key="pax.num" class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td class="p-1.5 text-slate-400">{{ pax.num }}</td>
+                        <td class="p-1.5 font-bold text-sky-600 dark:text-sky-400">{{ pax.pnr }}</td>
+                        <td class="p-1.5 font-sans font-semibold text-slate-900 dark:text-white">{{ pax.passenger_name }}</td>
+                        <td class="p-1.5 text-emerald-600 dark:text-emerald-400 font-bold">{{ pax.phone }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- PASO 2: ¿QUÉ PASÓ CON EL VUELO? (DEMORA O CANCELACIÓN) -->
+              <div class="space-y-3 pt-1">
+                <div class="flex items-center justify-between">
+                  <label class="block text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    2. Situación Operativa del Vuelo
                   </label>
+                  <span class="text-[11px] text-slate-400">Selecciona el motivo del aviso</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <!-- Botón Demora / Reprogramación -->
+                  <button 
+                    type="button" 
+                    @click="selectFlightSituation('flight_delay')"
+                    :class="broadcastForm.template_type === 'flight_delay' ? 'bg-amber-500 text-white font-bold border-amber-600' : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'"
+                    class="p-2.5 rounded-xl border text-left transition cursor-pointer"
+                  >
+                    <div class="font-bold text-xs">Vuelo Demorado</div>
+                    <div class="text-[10px] opacity-80">Reprogramar nueva hora</div>
+                  </button>
+
+                  <!-- Botón Cancelado por Mantenimiento -->
+                  <button 
+                    type="button" 
+                    @click="selectFlightSituation('flight_cancellation')"
+                    :class="broadcastForm.template_type === 'flight_cancellation' ? 'bg-red-600 text-white font-bold border-red-700' : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'"
+                    class="p-2.5 rounded-xl border text-left transition cursor-pointer"
+                  >
+                    <div class="font-bold text-xs">Cancelado (Mant.)</div>
+                    <div class="text-[10px] opacity-80">Por mantenimiento</div>
+                  </button>
+
+                  <!-- Botón Cancelado por EPTAM -->
+                  <button 
+                    type="button" 
+                    @click="selectFlightSituation('eptam_cancellation')"
+                    :class="broadcastForm.template_type === 'eptam_cancellation' ? 'bg-red-600 text-white font-bold border-red-700' : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'"
+                    class="p-2.5 rounded-xl border text-left transition cursor-pointer"
+                  >
+                    <div class="font-bold text-xs">Cancelado (EPTAM)</div>
+                    <div class="text-[10px] opacity-80">Disposición oficial</div>
+                  </button>
+                </div>
+
+                <!-- Campo de Hora Reprogramada (SI ES DEMORA) -->
+                <div v-if="broadcastForm.template_type === 'flight_delay'" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1">
+                  <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold text-amber-900 dark:text-amber-200">
+                      Nueva Hora Reprogramada de Salida:
+                    </label>
+                    <span class="text-[10px] text-amber-700 dark:text-amber-300">
+                      Modificación manual del horario
+                    </span>
+                  </div>
                   <input 
                     v-model="broadcastForm.flight_time"
                     type="text"
-                    placeholder="Ej. 12:00, 19:00 o 15:30"
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
+                    placeholder="Ej: 12:00, 19:00 o 15:30"
+                    class="w-full bg-white dark:bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Estado de Pasajeros</label>
-                  <select 
-                    v-model="broadcastForm.status"
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                  >
-                    <option value="emitido">Solo Boletos Emitidos / Confirmados</option>
-                    <option value="todos">Todos los Pasajeros Contactados</option>
-                  </select>
-                </div>
+              <!-- Números Adicionales Opcionales -->
+              <div class="pt-1">
+                <button 
+                  type="button" 
+                  @click="showManualPhones = !showManualPhones"
+                  class="text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer font-semibold"
+                >
+                  {{ showManualPhones ? 'Ocultar números adicionales' : '+ Agregar números de celular adicionales manualmente (opcional)' }}
+                </button>
 
-                <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    <span>Origen</span>
-                    <span class="text-[10px] text-slate-400 font-normal ml-1">(Auto-detectado del manifiesto)</span>
-                  </label>
-                  <select 
-                    v-model="broadcastForm.origin"
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                  >
-                    <option value="">Auto-detectar / Cualquier Origen</option>
-                    <option v-for="ap in airportOptions" :key="ap.code" :value="ap.code">{{ ap.name }}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    <span>Destino</span>
-                    <span class="text-[10px] text-slate-400 font-normal ml-1">(Auto-detectado del manifiesto)</span>
-                  </label>
-                  <select 
-                    v-model="broadcastForm.destination"
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                  >
-                    <option value="">Auto-detectar / Cualquier Destino</option>
-                    <option v-for="ap in airportOptions" :key="ap.code" :value="ap.code">{{ ap.name }}</option>
-                  </select>
-                </div>
-
-                <div class="sm:col-span-2">
-                  <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    <span>Números adicionales manuales (opcional)</span>
-                    <span class="text-[10px] text-slate-400 font-normal ml-1">Separados por coma o salto de línea (ej: 74844348, 71234567)</span>
-                  </label>
+                <div v-if="showManualPhones" class="mt-2">
                   <textarea 
                     v-model="broadcastForm.manual_phones"
                     rows="2"
@@ -1780,36 +1890,30 @@
                 <span class="text-[11px] text-slate-500">Consulta los pasajeros que recibirán el SMS antes del envío.</span>
                 <button 
                   type="button" 
-                  @click="fetchBroadcastPreview"
+                  @click="fetchBroadcastPreview" 
                   :disabled="broadcastPreviewLoading"
                   class="px-4 py-2 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-300 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
                 >
                   <Loader2 v-if="broadcastPreviewLoading" class="w-3.5 h-3.5 animate-spin" />
-                  <Search v-else class="w-3.5 h-3.5" />
                   <span>{{ broadcastPreviewLoading ? 'Calculando...' : 'Previsualizar Destinatarios' }}</span>
                 </button>
               </div>
 
               <!-- Resultados de la Previsualización -->
-              <div v-if="broadcastPreviewData" class="p-4 rounded-xl bg-sky-500/5 border border-sky-500/20 space-y-3 animate-fade-in">
+              <div v-if="broadcastPreviewData" class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-2">
-                  <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-xs">
-                      {{ broadcastPreviewData.total_recipients }}
+                  <div>
+                    <div class="text-xs font-bold text-slate-900 dark:text-white">
+                      {{ broadcastPreviewData.total_recipients }} Celular(es) Destinatario(s)
                     </div>
-                    <div>
-                      <div class="text-xs font-bold text-slate-900 dark:text-white">
-                        {{ broadcastPreviewData.total_recipients }} Pasajero(s) Encontrado(s)
-                      </div>
-                      <div class="text-[11px] text-slate-500">
-                        Tiempo estimado: ~{{ Math.ceil((broadcastPreviewData.total_recipients * 15) / 60) }} min (a 15s por SMS)
-                      </div>
+                    <div class="text-[11px] text-slate-500">
+                      Tiempo estimado: ~{{ Math.ceil((broadcastPreviewData.total_recipients * 15) / 60) }} min (a 15s por SMS)
                     </div>
                   </div>
 
                   <div class="text-right">
-                    <div class="text-xs font-extrabold" :class="smsCostClass">
-                      {{ broadcastPreviewData.sms_metrics?.total_sms_estimated || broadcastPreviewData.total_recipients }} SMS a consumir
+                    <div class="text-xs font-bold" :class="smsCostClass">
+                      {{ broadcastPreviewData.sms_metrics?.total_sms_estimated || broadcastPreviewData.total_recipients }} SMS totales a consumir
                     </div>
                     <div class="text-[10px] text-slate-400">
                       {{ broadcastPreviewData.sms_metrics?.sms_per_recipient }} SMS por cada pasajero
@@ -1818,9 +1922,9 @@
                 </div>
 
                 <!-- Tabla resumen de pasajeros (primeros 5) -->
-                <div v-if="broadcastPreviewData.sample_recipients?.length" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <div v-if="broadcastPreviewData.sample_recipients?.length" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                   <table class="w-full text-[11px] text-left">
-                    <thead class="bg-slate-100 dark:bg-slate-800/60 text-slate-500 font-semibold uppercase">
+                    <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold uppercase">
                       <tr>
                         <th class="p-2">Pasajero</th>
                         <th class="p-2">Teléfono</th>
@@ -1843,12 +1947,11 @@
                 <div class="pt-2 flex items-center justify-end">
                   <button 
                     type="button" 
-                    @click="submitBroadcastCampaign"
+                    @click="submitBroadcastCampaign" 
                     :disabled="broadcastSubmitting || broadcastPreviewData.total_recipients === 0"
-                    class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition cursor-pointer disabled:opacity-50"
+                    class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                   >
                     <Loader2 v-if="broadcastSubmitting" class="w-4 h-4 animate-spin" />
-                    <Send v-else class="w-4 h-4" />
                     <span>Iniciar Envío Masivo a {{ broadcastPreviewData.total_recipients }} Pasajero(s)</span>
                   </button>
                 </div>
@@ -1856,150 +1959,57 @@
 
             </div>
 
-            <!-- Columna Derecha: Redactor de SMS & Simulador Móvil (5 cols) -->
-            <div class="lg:col-span-5 space-y-4">
+            <!-- Columna Derecha: Redactor de SMS y Vista Previa (5 cols) -->
+            <div class="lg:col-span-5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
               
-              <!-- Redactor de Plantilla SMS -->
-              <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-3">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText class="w-4 h-4 text-sky-500" />
-                    <span>2. Plantilla y Contenido del SMS</span>
-                  </h3>
-                </div>
-
-                <!-- Botones de Selección Rápida de Plantilla -->
-                <div>
-                  <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                    Plantillas Oficiales (Sr/Sra + Apellido Paterno + Mensaje):
-                  </label>
-                  <div class="grid grid-cols-2 gap-1.5 text-[11px]">
-                    <button 
-                      type="button" 
-                      @click="applySmsTemplate('eptam_cancellation')"
-                      :class="broadcastForm.template_type === 'eptam_cancellation' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
-                      class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
-                    >
-                      Cancelación EPTAM
-                    </button>
-                    <button 
-                      type="button" 
-                      @click="applySmsTemplate('flight_delay')"
-                      :class="broadcastForm.template_type === 'flight_delay' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
-                      class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
-                    >
-                      Demora / Reprog.
-                    </button>
-                    <button 
-                      type="button" 
-                      @click="applySmsTemplate('flight_cancellation')"
-                      :class="broadcastForm.template_type === 'flight_cancellation' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
-                      class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
-                    >
-                      Cancelación Mant.
-                    </button>
-                    <button 
-                      type="button" 
-                      @click="applySmsTemplate('custom')"
-                      :class="broadcastForm.template_type === 'custom' ? 'bg-sky-500 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
-                      class="px-2.5 py-1.5 rounded-lg transition text-left truncate cursor-pointer"
-                    >
-                      Texto Libre
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Textarea del SMS -->
-                <div>
-                  <textarea 
-                    v-model="broadcastForm.message"
-                    rows="5"
-                    required
-                    placeholder="Escribe el mensaje SMS para los pasajeros..."
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono leading-relaxed"
-                  ></textarea>
-                </div>
-
-                <!-- Contador GSM-7 y Control de Saldo de Entel -->
-                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
-                  <div class="flex items-center justify-between">
-                    <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <Smartphone class="w-3.5 h-3.5 text-sky-500" />
-                      <span>Longitud GSM-7:</span>
-                    </span>
-                    <span class="font-mono font-bold" :class="smsCostClass">
-                      {{ smsCharCount }} caracteres
-                    </span>
-                  </div>
-
-                  <!-- Barra de Progreso del Límite de 160 Caracteres -->
-                  <div class="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      class="h-full transition-all duration-300"
-                      :class="smsCharCount <= 160 ? 'bg-emerald-500' : (smsCharCount <= 306 ? 'bg-amber-500' : 'bg-red-500')"
-                      :style="{ width: Math.min(100, (smsCharCount / 160) * 100) + '%' }"
-                    ></div>
-                  </div>
-
-                  <div class="flex items-center justify-between text-[11px] pt-1">
-                    <span v-if="smsCharCount <= 160" class="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      <Check class="w-3.5 h-3.5" />
-                      1 SMS (Consumo estándar de 1 crédito)
-                    </span>
-                    <span v-else-if="smsCharCount <= 306" class="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
-                      <AlertCircle class="w-3.5 h-3.5" />
-                      2 SMS (Mensaje en 2 partes concatenadas)
-                    </span>
-                    <span v-else class="text-red-500 font-semibold flex items-center gap-1">
-                      <AlertTriangle class="w-3.5 h-3.5" />
-                      3+ SMS (Alto consumo de saldo)
-                    </span>
-
-                    <span class="text-slate-400 text-[10px] font-mono">
-                      {{ smsSegmentCount }} parte(s)
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Botones para Insertar Etiquetas Dinámicas -->
-                <div>
-                  <span class="block text-[11px] font-semibold text-slate-500 mb-1">Insertar variables:</span>
-                  <div class="flex flex-wrap gap-1">
-                    <button 
-                      v-for="tag in ['{apellido}', '{pasajero}', '{vuelo}', '{origen}', '{destino}', '{fecha}', '{hora}', '{pnr}']"
-                      :key="tag"
-                      type="button"
-                      @click="insertSmsTag(tag)"
-                      class="px-2 py-0.5 rounded-md bg-sky-50 hover:bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:hover:bg-sky-900/60 dark:text-sky-300 text-[11px] font-mono transition cursor-pointer"
-                    >
-                      +{{ tag }}
-                    </button>
-                  </div>
-                </div>
-
+              <div class="pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  3. Mensaje SMS a Transmitir
+                </h3>
+                <span class="text-[11px] font-mono" :class="smsCostClass">
+                  {{ smsCharCount }} caracteres ({{ smsSegmentCount }} SMS)
+                </span>
               </div>
 
-              <!-- Simulador de Teléfono Celular (Vista del Pasajero) -->
-              <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs space-y-2">
-                <div class="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <span class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                    <Smartphone class="w-3.5 h-3.5 text-slate-500" />
-                    Vista en Celular del Pasajero
-                  </span>
-                  <span class="text-[10px] text-slate-400 font-mono">Bandeja SMS</span>
+              <!-- Textarea del SMS -->
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  Texto del mensaje:
+                </label>
+                <textarea 
+                  v-model="broadcastForm.message"
+                  rows="6"
+                  required
+                  placeholder="Escribe el mensaje SMS para los pasajeros..."
+                  class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono leading-relaxed"
+                ></textarea>
+              </div>
+
+              <!-- Botones para Insertar Etiquetas Dinámicas -->
+              <div>
+                <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">Insertar variables:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button 
+                    v-for="tag in ['{apellido}', '{vuelo}', '{origen}', '{destino}', '{fecha}', '{hora}', '{pnr}']"
+                    :key="tag"
+                    type="button"
+                    @click="insertSmsTag(tag)"
+                    class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 text-[11px] font-mono transition cursor-pointer"
+                  >
+                    +{{ tag }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Vista Previa Limpia del Texto (Sin simulador falso de teléfono) -->
+              <div class="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                <div class="flex items-center justify-between text-[11px] text-slate-500">
+                  <span class="font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Vista Previa del Mensaje</span>
+                  <span class="font-mono text-[10px]">Texto recibido por el pasajero</span>
                 </div>
 
-                <!-- Pantalla del Celular -->
-                <div class="rounded-xl bg-slate-100 dark:bg-slate-950 p-3.5 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                  <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                    <span class="font-bold text-slate-700 dark:text-slate-300">De: TAMEP (GoIP)</span>
-                    <span>Ahora</span>
-                  </div>
-
-                  <!-- Burbuja de SMS -->
-                  <div class="p-3 rounded-xl rounded-tl-none bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs shadow-xs leading-relaxed font-mono whitespace-pre-wrap break-words select-text border border-slate-200 dark:border-slate-700">
-                    {{ previewSimulatedMessage || 'Escribe tu mensaje en la plantilla para ver cómo lo recibirá el pasajero...' }}
-                  </div>
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200 font-mono whitespace-pre-wrap break-words leading-relaxed">
+                  {{ previewSimulatedMessage || 'Escribe tu mensaje en la plantilla para previsualizar...' }}
                 </div>
               </div>
 
@@ -2011,9 +2021,8 @@
           <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
               <div>
-                <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                  <Radio class="w-4 h-4 text-sky-500" />
-                  <span>Historial de Envíos Masivos por GoIP</span>
+                <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Historial de Envíos Masivos
                 </h3>
                 <p class="text-[11px] text-slate-500">Registro de auditoría y reportes de entrega celular</p>
               </div>
@@ -2023,22 +2032,68 @@
                   type="button" 
                   @click="triggerProcessQueue" 
                   :disabled="processingQueue"
-                  class="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-xs text-white font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                  class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs text-white font-semibold flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Loader2 v-if="processingQueue" class="w-3.5 h-3.5 animate-spin" />
-                  <Send v-else class="w-3.5 h-3.5" />
-                  <span>{{ processingQueue ? 'Despachando...' : 'Procesar Cola SMS Ahora' }}</span>
+                  <span>{{ processingQueue ? 'Despachando...' : 'Procesar Cola SMS' }}</span>
                 </button>
 
                 <button 
                   type="button" 
                   @click="fetchBroadcastCampaigns" 
                   :disabled="broadcastLoading"
-                  class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition cursor-pointer"
+                  class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-300 font-semibold transition cursor-pointer"
                 >
-                  <RefreshCw class="w-3.5 h-3.5" :class="{'animate-spin': broadcastLoading}" />
-                  <span>Actualizar Historial</span>
+                  <span>{{ broadcastLoading ? 'Cargando...' : 'Actualizar' }}</span>
                 </button>
+              </div>
+            </div>
+
+            <!-- Barra de Filtros por Vuelo y Día -->
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-1.5">
+                  <label class="font-bold text-slate-700 dark:text-slate-300">N° Vuelo:</label>
+                  <input 
+                    v-model="broadcastFilters.flight_number"
+                    type="text"
+                    placeholder="Ej: 708"
+                    @keyup.enter="fetchBroadcastCampaigns"
+                    class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono font-bold uppercase w-24 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                  <label class="font-bold text-slate-700 dark:text-slate-300">Fecha:</label>
+                  <input 
+                    v-model="broadcastFilters.date"
+                    type="date"
+                    @change="fetchBroadcastCampaigns"
+                    class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <button 
+                  type="button" 
+                  @click="fetchBroadcastCampaigns"
+                  :disabled="broadcastLoading"
+                  class="px-3 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  Filtrar
+                </button>
+
+                <button 
+                  v-if="broadcastFilters.flight_number || broadcastFilters.date"
+                  type="button" 
+                  @click="clearBroadcastFilters"
+                  class="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
+                >
+                  Limpiar
+                </button>
+              </div>
+
+              <div v-if="broadcastFilters.flight_number || broadcastFilters.date" class="text-[11px] text-slate-500 font-mono">
+                Filtro activo: {{ broadcastFilters.flight_number ? 'Vuelo ' + broadcastFilters.flight_number : '' }} {{ broadcastFilters.date ? (broadcastFilters.flight_number ? '· ' : '') + broadcastFilters.date : '' }}
               </div>
             </div>
 
@@ -2089,7 +2144,7 @@
                         class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
                         :class="[
                           c.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
-                          c.status === 'processing' ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 animate-pulse' :
+                          c.status === 'processing' ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20' :
                           'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                         ]"
                       >
@@ -2101,19 +2156,17 @@
                         <button 
                           type="button" 
                           @click="openCampaignDetails(c)"
-                          class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                          title="Ver detalle de pasajeros"
+                          class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition cursor-pointer"
                         >
-                          <Eye class="w-4 h-4" />
+                          Ver detalle
                         </button>
                         <button 
                           v-if="c.failed_count > 0"
                           type="button" 
                           @click="retryFailedCampaign(c)"
-                          class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 transition cursor-pointer"
-                          title="Reintentar pasajeros fallidos"
+                          class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 text-xs font-semibold transition cursor-pointer"
                         >
-                          <RotateCcw class="w-4 h-4" />
+                          Reintentar
                         </button>
                       </div>
                     </td>
@@ -2123,9 +2176,8 @@
             </div>
 
             <!-- Estado Vacío -->
-            <div v-else class="p-8 text-center text-slate-400 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 text-xs">
-              <Radio class="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
-              <span>Aún no se han emitido campañas masivas por SMS. Configura una arriba para comenzar.</span>
+            <div v-else class="p-6 text-center text-slate-500 dark:text-slate-400 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 text-xs">
+              Aún no se han emitido campañas masivas por SMS. Configura una arriba para comenzar.
             </div>
           </div>
 
@@ -2722,25 +2774,20 @@
       >
         <div class="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto animate-slide-up">
           <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-            <div class="flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
-                <Radio class="w-5 h-5" />
-              </div>
-              <div>
-                <h3 class="text-sm font-bold text-slate-900 dark:text-white">
-                  Reporte de Entrega: {{ broadcastDetailModal.campaign?.title }}
-                </h3>
-                <p class="text-[11px] text-slate-500">
-                  {{ broadcastDetailModal.campaign?.sent_count }} de {{ broadcastDetailModal.campaign?.total_recipients }} entregados por GoIP (Entel)
-                </p>
-              </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">
+                Reporte de Entrega: {{ broadcastDetailModal.campaign?.title }}
+              </h3>
+              <p class="text-[11px] text-slate-500">
+                {{ broadcastDetailModal.campaign?.sent_count }} de {{ broadcastDetailModal.campaign?.total_recipients }} entregados por GoIP (Entel)
+              </p>
             </div>
             <button 
               type="button" 
               @click="broadcastDetailModal.isOpen = false"
-              class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              class="px-2 py-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer text-xs"
             >
-              <X class="w-4 h-4" />
+              ✕
             </button>
           </div>
 
@@ -2779,7 +2826,7 @@
                       :class="[
                         r.status === 'sent' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
                         r.status === 'failed' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
-                        'bg-sky-500/10 text-sky-600 dark:text-sky-400 animate-pulse'
+                        'bg-sky-500/10 text-sky-600 dark:text-sky-400'
                       ]"
                     >
                       {{ r.status === 'sent' ? 'Entregado' : (r.status === 'failed' ? 'Fallido' : 'En cola GoIP') }}
@@ -2805,10 +2852,9 @@
               v-if="broadcastDetailModal.campaign?.failed_count > 0"
               type="button" 
               @click="retryFailedCampaign(broadcastDetailModal.campaign)"
-              class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              class="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition cursor-pointer"
             >
-              <RotateCcw class="w-3.5 h-3.5" />
-              <span>Reintentar {{ broadcastDetailModal.campaign.failed_count }} Fallidos</span>
+              Reintentar {{ broadcastDetailModal.campaign.failed_count }} Fallidos
             </button>
             <div v-else></div>
 
@@ -3700,7 +3746,19 @@ function formatWhatsAppPreview(rawText) {
 // ========================================================
 // PESTAÑA: DIFUSIÓN MASIVA POR SMS GOIP (ENTEL)
 // ========================================================
+const broadcastAirports = [
+  { code: 'CBB', city: 'Cochabamba', name: 'Cochabamba (CBB)' },
+  { code: 'CIJ', city: 'Cobija', name: 'Cobija (CIJ)' },
+  { code: 'LPB', city: 'La Paz', name: 'La Paz (LPB)' },
+  { code: 'VVI', city: 'Santa Cruz', name: 'Santa Cruz (VVI)' },
+];
+
+const availableFlightsList = ref([]);
 const broadcastCampaigns = ref([]);
+const broadcastFilters = ref({
+  flight_number: '',
+  date: '',
+});
 const broadcastLoading = ref(false);
 const broadcastSubmitting = ref(false);
 const broadcastPreviewLoading = ref(false);
@@ -3715,21 +3773,23 @@ const smsTemplates = {
 };
 
 const broadcastForm = ref({
-  title: 'Aviso de Vuelo EPTAM/TAMEP',
+  title: '',
   flight_number: '',
-  flight_date: '',
-  flight_time: '15:30',
-  status: 'all',
+  flight_date: new Date().toISOString().split('T')[0],
+  flight_time: '',
+  status: '',
   origin: '',
   destination: '',
   manual_phones: '',
-  template_type: 'eptam_cancellation',
-  message: smsTemplates.eptam_cancellation,
+  template_type: 'flight_delay',
+  message: smsTemplates.flight_delay,
   manifest_passengers: [],
 });
 
 const verifyingFlight = ref(false);
 const processingQueue = ref(false);
+const flightDetectedInfo = ref(null);
+const showManualPhones = ref(false);
 
 const broadcastDetailModal = ref({
   isOpen: false,
@@ -3741,6 +3801,7 @@ const broadcastDetailModal = ref({
 const importedManifest = ref(null);
 const showManifestTable = ref(false);
 const manifestLoading = ref(false);
+const isDraggingManifest = ref(false);
 
 const airportCityNames = {
   VVI: 'Santa Cruz',
@@ -3791,8 +3852,8 @@ const previewSimulatedMessage = computed(() => {
   };
 
   const surname = pax.paternal_surname || extractPaternalSurname(pax.passenger_name);
-  const origCity = resolveCity(broadcastForm.value.origin || pax.origin);
-  const destCity = resolveCity(broadcastForm.value.destination || pax.destination);
+  const origCity = flightDetectedInfo.value?.origin_city || resolveCity(broadcastForm.value.origin || pax.origin);
+  const destCity = flightDetectedInfo.value?.destination_city || resolveCity(broadcastForm.value.destination || pax.destination);
 
   let dateStr = broadcastForm.value.flight_date || pax.flight_date || '11/10/2026';
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -3811,9 +3872,11 @@ const previewSimulatedMessage = computed(() => {
     text = `Sr/Sra ${surname}: ${text}`;
   }
 
+  const cleanFlight = (broadcastForm.value.flight_number || pax.flight_number || '708').replace(/^TM-?/i, '');
+
   text = text.replace(/{apellido}|{apellido_paterno}/gi, surname);
   text = text.replace(/{pasajero}|{nombre}/gi, surname); // Solo apellido paterno, nunca nombre completo
-  text = text.replace(/{vuelo}/gi, broadcastForm.value.flight_number || pax.flight_number || '708');
+  text = text.replace(/{vuelo}/gi, cleanFlight);
   text = text.replace(/{fecha}/gi, dateStr);
   text = text.replace(/{hora}/gi, timeStr);
   text = text.replace(/{origen}/gi, origCity);
@@ -3841,24 +3904,29 @@ const smsCostClass = computed(() => {
   return 'text-red-500';
 });
 
-async function loadDefaultManifestPdf() {
-  manifestLoading.value = true;
-  try {
-    const res = await api.post('/admin/broadcasts/import-pdf', { use_default_doc: true });
-    if (res.data?.success && res.data.manifest) {
-      applyImportedManifest(res.data.manifest);
-      showToast(res.data.message || 'Manifiesto cargado exitosamente.');
+function handleFileDrop(event) {
+  isDraggingManifest.value = false;
+  const file = event.dataTransfer?.files?.[0];
+  if (file) {
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      processManifestPdfFile(file);
+    } else {
+      showToast('El archivo arrastrado debe ser un documento PDF válido.', 'error');
     }
-  } catch (e) {
-    console.error('Error cargando manifiesto:', e);
-    showToast(e.response?.data?.message || 'Error al cargar /documentos/vuelo.pdf', 'error');
-  } finally {
-    manifestLoading.value = false;
   }
 }
 
-async function handleManifestFileUpload(event) {
+function handleManifestFileUpload(event) {
   const file = event.target.files?.[0];
+  if (file) {
+    processManifestPdfFile(file);
+  }
+  if (event.target) {
+    event.target.value = '';
+  }
+}
+
+async function processManifestPdfFile(file) {
   if (!file) return;
 
   manifestLoading.value = true;
@@ -3871,14 +3939,13 @@ async function handleManifestFileUpload(event) {
     });
     if (res.data?.success && res.data.manifest) {
       applyImportedManifest(res.data.manifest);
-      showToast(res.data.message || 'Manifiesto procesado exitosamente.');
+      showToast(res.data.message || 'Manifiesto de pasajeros cargado exitosamente.');
     }
   } catch (e) {
-    console.error('Error subiendo PDF:', e);
-    showToast(e.response?.data?.message || 'Error al procesar el archivo PDF', 'error');
+    console.error('Error subiendo PDF de manifiesto:', e);
+    showToast(e.response?.data?.message || 'Error al procesar el archivo PDF del manifiesto', 'error');
   } finally {
     manifestLoading.value = false;
-    if (event.target) event.target.value = '';
   }
 }
 
@@ -3889,7 +3956,6 @@ function applyImportedManifest(manifest) {
   // Auto-completar los datos del formulario con el manifiesto
   if (manifest.flight_number) {
     broadcastForm.value.flight_number = manifest.flight_number;
-    broadcastForm.value.title = `Aviso Vuelo ${manifest.flight_number}`;
   }
   if (manifest.departure_date) {
     broadcastForm.value.flight_date = manifest.departure_date;
@@ -3907,23 +3973,53 @@ function applyImportedManifest(manifest) {
   // Guardar lista de pasajeros en el formulario
   broadcastForm.value.manifest_passengers = manifest.passengers || [];
 
+  flightDetectedInfo.value = {
+    source: 'manifest_pdf',
+    flight_number: manifest.flight_number,
+    origin: manifest.origin,
+    destination: manifest.destination,
+    origin_city: resolveCity(manifest.origin),
+    destination_city: resolveCity(manifest.destination),
+    departure_time: manifest.departure_time,
+    departure_date: manifest.departure_date,
+    departure_date_raw: manifest.departure_date_raw,
+    valid_phones_count: manifest.valid_phones_count,
+    total_passengers: manifest.total_passengers,
+  };
+
   // Calcular previsualización inmediata con los datos del manifiesto
   fetchBroadcastPreview();
+}
+
+function clearFlightDetected() {
+  flightDetectedInfo.value = null;
+  broadcastForm.value.flight_number = '';
+  broadcastForm.value.flight_time = '';
+  clearImportedManifest();
 }
 
 function clearImportedManifest() {
   importedManifest.value = null;
   showManifestTable.value = false;
   broadcastForm.value.manifest_passengers = [];
-  broadcastPreviewData.value = null;
+  if (flightDetectedInfo.value?.source === 'manifest_pdf') {
+    flightDetectedInfo.value = null;
+    broadcastForm.value.flight_number = '';
+    broadcastForm.value.flight_time = '';
+  }
   fetchBroadcastPreview();
+  showToast('Manifiesto PDF removido. Se usarán los pasajeros registrados en el CRM.', 'info');
 }
 
-function applySmsTemplate(type) {
+function selectFlightSituation(type) {
   broadcastForm.value.template_type = type;
   if (smsTemplates[type]) {
     broadcastForm.value.message = smsTemplates[type];
   }
+}
+
+function applySmsTemplate(type) {
+  selectFlightSituation(type);
 }
 
 function insertSmsTag(tag) {
@@ -3989,7 +4085,14 @@ async function submitBroadcastCampaign() {
 async function fetchBroadcastCampaigns() {
   broadcastLoading.value = true;
   try {
-    const res = await api.get('/admin/broadcasts');
+    const params = {};
+    if (broadcastFilters.value.flight_number) {
+      params.flight_number = broadcastFilters.value.flight_number;
+    }
+    if (broadcastFilters.value.date) {
+      params.date = broadcastFilters.value.date;
+    }
+    const res = await api.get('/admin/broadcasts', { params });
     if (res.data?.success) {
       broadcastCampaigns.value = res.data.campaigns.data || [];
     }
@@ -3998,6 +4101,12 @@ async function fetchBroadcastCampaigns() {
   } finally {
     broadcastLoading.value = false;
   }
+}
+
+function clearBroadcastFilters() {
+  broadcastFilters.value.flight_number = '';
+  broadcastFilters.value.date = '';
+  fetchBroadcastCampaigns();
 }
 
 async function openCampaignDetails(campaign) {
@@ -4035,32 +4144,99 @@ async function retryFailedCampaign(campaign) {
   }
 }
 
+function isFlightSelected(flight) {
+  if (!flight || !broadcastForm.value.flight_number) return false;
+  const cleanCurrent = (broadcastForm.value.flight_number || '').replace(/^TM-?\s*/i, '').trim();
+  const cleanFl = (flight.flight_number || '').replace(/^TM-?\s*/i, '').trim();
+  return cleanCurrent === cleanFl;
+}
+
+function selectAvailableFlight(flight) {
+  if (!flight) return;
+
+  // Limpiar cualquier PDF previo para que no se quede precargado eternamente
+  if (importedManifest.value || broadcastForm.value.manifest_passengers.length) {
+    importedManifest.value = null;
+    showManifestTable.value = false;
+    broadcastForm.value.manifest_passengers = [];
+  }
+
+  const cleanNumber = (flight.flight_number || '').replace(/^TM-?\s*/i, '').trim();
+  broadcastForm.value.flight_number = cleanNumber;
+  if (flight.departure_time) {
+    broadcastForm.value.flight_time = flight.departure_time;
+  }
+  if (flight.origin) {
+    broadcastForm.value.origin = flight.origin;
+  }
+  if (flight.destination) {
+    broadcastForm.value.destination = flight.destination;
+  }
+  if (flight.departure_date) {
+    broadcastForm.value.flight_date = flight.departure_date;
+  }
+
+  flightDetectedInfo.value = {
+    source: 'transclick',
+    flight_number: cleanNumber,
+    origin: flight.origin || broadcastForm.value.origin,
+    destination: flight.destination || broadcastForm.value.destination,
+    origin_city: flight.origin_city || resolveCity(flight.origin || broadcastForm.value.origin),
+    destination_city: flight.destination_city || resolveCity(flight.destination || broadcastForm.value.destination),
+    departure_time: flight.departure_time || broadcastForm.value.flight_time || 'N/A',
+    departure_date: flight.departure_date || broadcastForm.value.flight_date,
+    status: flight.status || 'Programado',
+  };
+
+  const routeStr = `${flightDetectedInfo.value.origin_city} → ${flightDetectedInfo.value.destination_city}`;
+  showToast(`Vuelo TM-${cleanNumber} seleccionado (${routeStr} - ${flight.departure_time || 'N/A'}).`);
+  fetchBroadcastPreview();
+}
+
+function onFlightDateOrRouteChange() {
+  // Limpiar manifiesto PDF previo si se cambia la fecha o ruta de búsqueda
+  if (importedManifest.value || broadcastForm.value.manifest_passengers.length) {
+    importedManifest.value = null;
+    showManifestTable.value = false;
+    broadcastForm.value.manifest_passengers = [];
+  }
+  if (broadcastForm.value.flight_date) {
+    verifyFlightWithTransclick();
+  }
+}
+
 async function verifyFlightWithTransclick() {
-  if (!broadcastForm.value.flight_number) {
-    showToast('Ingrese un número de vuelo primero (ej: 708 o TM-708)', 'error');
+  if (!broadcastForm.value.flight_date) {
+    showToast('Seleccione la fecha del vuelo para consultar Transclick', 'error');
     return;
   }
   verifyingFlight.value = true;
+  availableFlightsList.value = [];
   try {
     const res = await api.post('/admin/broadcasts/check-flight', {
-      flight_number: broadcastForm.value.flight_number,
-      flight_date: broadcastForm.value.flight_date || '',
       origin: broadcastForm.value.origin || '',
       destination: broadcastForm.value.destination || '',
+      flight_date: broadcastForm.value.flight_date || '',
+      flight_number: broadcastForm.value.flight_number || '',
     });
-    if (res.data?.success && res.data.found && res.data.flight) {
-      if (res.data.origin) broadcastForm.value.origin = res.data.origin;
-      if (res.data.destination) broadcastForm.value.destination = res.data.destination;
-      if (res.data.departure_time) broadcastForm.value.flight_time = res.data.departure_time;
-      if (res.data.departure_date && !broadcastForm.value.flight_date) {
-        broadcastForm.value.flight_date = res.data.departure_date;
-      }
+    if (res.data?.success && res.data.found && res.data.flights?.length) {
+      availableFlightsList.value = res.data.flights;
+      showToast(`Transclick: ${res.data.flights.length} vuelo(s) programado(s) encontrado(s).`);
 
-      const routeStr = `${res.data.origin_city || res.data.origin} → ${res.data.destination_city || res.data.destination}`;
-      showToast(`Vuelo detectado en Transclick: ${routeStr} a las ${res.data.departure_time || 'N/A'}`);
-      fetchBroadcastPreview();
+      // Si solo hay un vuelo disponible, seleccionarlo automáticamente
+      if (res.data.flights.length === 1) {
+        selectAvailableFlight(res.data.flights[0]);
+      } else if (broadcastForm.value.flight_number) {
+        const clean = (broadcastForm.value.flight_number || '').replace(/^TM-?\s*/i, '').trim();
+        const found = res.data.flights.find(f => (f.flight_number || '').replace(/^TM-?\s*/i, '').trim() === clean);
+        if (found) {
+          selectAvailableFlight(found);
+        }
+      }
     } else {
-      showToast(res.data?.message || 'No se encontró el vuelo en la programación de Transclick.', 'info');
+      availableFlightsList.value = [];
+      flightDetectedInfo.value = null;
+      showToast(res.data?.message || 'No se encontraron vuelos programados para esa fecha.', 'info');
     }
   } catch (e) {
     console.error('Error al verificar vuelo con Transclick:', e);

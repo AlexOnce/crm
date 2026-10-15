@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Lead;
 use Carbon\Carbon;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -271,6 +273,113 @@ class FlightMicroservice
         }
 
         return [];
+    }
+
+    /**
+     * Consulta vuelos disponibles en múltiples rutas en paralelo utilizando Http::pool.
+     *
+     * @param  array<int, array{0: string, 1: string}>  $routes  Lista de pares [origen, destino]
+     */
+    public function searchRoutesParallel(array $routes, ?string $date = null): array
+    {
+        if (empty($routes)) {
+            return [];
+        }
+
+        $token = $this->getAccessToken();
+        if (! $token) {
+            return [];
+        }
+
+        $parsedDate = $date ? Carbon::parse($date)->format('Y-m-d') : now()->addDay()->format('Y-m-d');
+        $departureDateApi = "{$parsedDate} 00:00:00";
+        $baseUrl = config('services.airclick.base_url', 'https://agair.transclicksolutions.com');
+
+        try {
+            $responses = Http::pool(function (Pool $pool) use ($routes, $baseUrl, $token, $departureDateApi) {
+                $calls = [];
+                foreach ($routes as $idx => [$orig, $dest]) {
+                    $origIata = $this->resolveIataCode($orig);
+                    $destIata = $this->resolveIataCode($dest);
+                    $calls["{$idx}_{$origIata}_{$destIata}"] = $pool->withoutVerifying()
+                        ->timeout(12)
+                        ->withHeaders([
+                            'Authorization' => 'Bearer '.$token,
+                            'access' => $token,
+                            'Content-Type' => 'application/json',
+                        ])
+                        ->get("{$baseUrl}/sales/ext/flights", [
+                            'originIata' => $origIata,
+                            'destinyIata' => $destIata,
+                            'adults' => 1,
+                            'children' => 0,
+                            'babies' => 0,
+                            'departureDate' => $departureDateApi,
+                        ]);
+                }
+
+                return $calls;
+            });
+
+            $allFlights = [];
+            $seenFlightKeys = [];
+
+            foreach ($responses as $key => $res) {
+                if ($res instanceof Response && $res->successful()) {
+                    $data = $res->json();
+                    $flights = $data['flights'] ?? [];
+                    if (! empty($flights)) {
+                        $parts = explode('_', $key);
+                        $fallbackOrig = $parts[1] ?? 'VVI';
+                        $fallbackDest = $parts[2] ?? 'LPB';
+
+                        foreach ($flights as $f) {
+                            $num = 'TM-'.($f['number'] ?? '101');
+                            $depTime = $f['departureTime'] ?? '08:00';
+                            $depDate = $f['departureDate'] ?? $parsedDate;
+                            $uniqueKey = "{$num}_{$depDate}_{$depTime}";
+
+                            if (! isset($seenFlightKeys[$uniqueKey])) {
+                                $seenFlightKeys[$uniqueKey] = true;
+                                $origIata = $f['origin']['iataCode'] ?? $fallbackOrig;
+                                $destIata = $f['destiny']['iataCode'] ?? $fallbackDest;
+
+                                $allFlights[] = [
+                                    'flight_number' => $num,
+                                    'origin' => $origIata,
+                                    'origin_city' => $f['origin']['city'] ?? $this->getCityName($origIata),
+                                    'origin_name' => $f['origin']['name'] ?? '',
+                                    'destination' => $destIata,
+                                    'destination_city' => $f['destiny']['city'] ?? $this->getCityName($destIata),
+                                    'destination_name' => $f['destiny']['name'] ?? '',
+                                    'departure_time' => $depTime,
+                                    'arrival_time' => $f['arrivalTime'] ?? '09:00',
+                                    'departure_date' => $depDate,
+                                    'seats' => (int) ($f['seats'] ?? 0),
+                                    'price' => (float) ($f['totalAmount'] ?? 450.00),
+                                    'currency' => 'BOB',
+                                    'aircraft' => 'Avro RJ70 CP-3106',
+                                    'is_live' => true,
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Ordenar por hora de salida
+            usort($allFlights, function ($a, $b) {
+                return strcmp($a['departure_time'] ?? '', $b['departure_time'] ?? '');
+            });
+
+            return $allFlights;
+        } catch (\Throwable $e) {
+            Log::error('Airclick API: Excepción al consultar rutas en paralelo', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**

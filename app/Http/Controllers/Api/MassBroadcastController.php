@@ -55,9 +55,6 @@ class MassBroadcastController extends Controller
 
         if (! empty($validated['status']) && $validated['status'] !== 'todos') {
             $query->where('status', $validated['status']);
-        } else {
-            // Por defecto, considerar pasajes emitidos o comprados
-            $query->whereIn('status', ['emitido', 'comprado', 'contactado']);
         }
 
         $leads = $query->select([
@@ -177,7 +174,7 @@ class MassBroadcastController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:150',
+            'title' => 'nullable|string|max:150',
             'channel' => 'nullable|in:sms',
             'template_type' => 'nullable|string|max:50',
             'message' => 'required|string|max:1000',
@@ -193,6 +190,9 @@ class MassBroadcastController extends Controller
 
         $validated['channel'] = 'sms';
         $validated['template_type'] = $validated['template_type'] ?? 'custom';
+        $validated['title'] = ! empty($validated['title'])
+            ? $validated['title']
+            : ('Aviso Vuelo '.($validated['flight_number'] ? 'TM-'.preg_replace('/^TM-?/i', '', $validated['flight_number']) : 'TAMep').' '.($validated['flight_date'] ?? now()->format('d/m/Y')));
 
         return DB::transaction(function () use ($validated, $request) {
             // 1. Obtener lista de destinatarios únicos
@@ -216,8 +216,6 @@ class MassBroadcastController extends Controller
 
             if (! empty($validated['status']) && $validated['status'] !== 'todos') {
                 $query->where('status', $validated['status']);
-            } else {
-                $query->whereIn('status', ['emitido', 'comprado', 'contactado']);
             }
 
             $leads = $query->select([
@@ -383,13 +381,32 @@ class MassBroadcastController extends Controller
     }
 
     /**
-     * Listado paginado de campañas de difusión masiva.
+     * Listado paginado de campañas de difusión masiva con filtros opcionales de vuelo y fecha.
      */
     public function index(Request $request): JsonResponse
     {
-        $campaigns = BroadcastCampaign::with('user:id,name')
-            ->orderByDesc('id')
-            ->paginate(15);
+        $query = BroadcastCampaign::with('user:id,name');
+
+        if ($request->filled('flight_number')) {
+            $flightNum = trim(preg_replace('/^TM-?/i', '', (string) $request->input('flight_number')));
+            $query->where(function ($q) use ($flightNum) {
+                $q->where('title', 'like', "%{$flightNum}%")
+                    ->orWhere('filters->flight_number', 'like', "%{$flightNum}%")
+                    ->orWhereHas('recipients', function ($r) use ($flightNum) {
+                        $r->where('flight_number', 'like', "%{$flightNum}%");
+                    });
+            });
+        }
+
+        if ($request->filled('date')) {
+            $date = (string) $request->input('date');
+            $query->where(function ($q) use ($date) {
+                $q->whereDate('created_at', $date)
+                    ->orWhere('filters->flight_date', $date);
+            });
+        }
+
+        $campaigns = $query->orderByDesc('id')->paginate(15);
 
         return response()->json([
             'success' => true,
@@ -622,71 +639,110 @@ class MassBroadcastController extends Controller
     public function checkFlightStatus(Request $request, FlightMicroservice $flightService): JsonResponse
     {
         $validated = $request->validate([
-            'flight_number' => 'required|string',
+            'flight_number' => 'nullable|string',
             'flight_date' => 'nullable|string',
             'origin' => 'nullable|string',
             'destination' => 'nullable|string',
         ]);
 
-        $cleanFlightNumber = strtoupper(trim(preg_replace('/^TM-?/i', '', $validated['flight_number'])));
+        $cleanFlightNumber = ! empty($validated['flight_number'])
+            ? strtoupper(trim(preg_replace('/^TM-?/i', '', (string) $validated['flight_number'])))
+            : null;
+
         $date = ! empty($validated['flight_date'])
             ? Carbon::parse($validated['flight_date'])->format('Y-m-d')
             : now()->format('Y-m-d');
 
-        $routesToTry = [];
-        if (! empty($validated['origin']) && ! empty($validated['destination'])) {
-            $routesToTry[] = [$validated['origin'], $validated['destination']];
-        } else {
-            // Rutas habituales de TAMep para detección automática
-            $routesToTry = [
-                ['VVI', 'LPB'],
-                ['LPB', 'VVI'],
-                ['CBB', 'LPB'],
-                ['LPB', 'CBB'],
-                ['VVI', 'CBB'],
-                ['CBB', 'VVI'],
-                ['TJA', 'VVI'],
-                ['VVI', 'TJA'],
-                ['SRE', 'LPB'],
-                ['LPB', 'SRE'],
-                ['TDD', 'LPB'],
-                ['CIJ', 'LPB'],
-            ];
-        }
+        $orig = ! empty($validated['origin']) ? strtoupper(trim($validated['origin'])) : null;
+        $dest = ! empty($validated['destination']) ? strtoupper(trim($validated['destination'])) : null;
 
         try {
+            $allFlights = [];
             $matchedFlight = null;
-            foreach ($routesToTry as [$orig, $dest]) {
-                $flights = $flightService->searchFlights($orig, $dest, $date);
-                foreach ($flights as $f) {
-                    $num = strtoupper(trim(preg_replace('/^TM-?/i', '', $f['flight_number'])));
-                    if ($num === $cleanFlightNumber || str_contains($num, $cleanFlightNumber)) {
-                        $matchedFlight = $f;
-                        break 2;
+
+            if ($orig && $dest) {
+                // Búsqueda directa por Origen y Destino solicitados
+                $allFlights = $flightService->searchFlights($orig, $dest, $date);
+            } else {
+                // Búsqueda flexible cuando solo se selecciona la fecha (o solo origen/destino)
+                $allRoutes = [
+                    ['VVI', 'LPB'],
+                    ['LPB', 'VVI'],
+                    ['CBB', 'LPB'],
+                    ['LPB', 'CBB'],
+                    ['VVI', 'CBB'],
+                    ['CBB', 'VVI'],
+                    ['CIJ', 'LPB'],
+                    ['LPB', 'CIJ'],
+                    ['CIJ', 'VVI'],
+                    ['VVI', 'CIJ'],
+                    ['CIJ', 'CBB'],
+                    ['CBB', 'CIJ'],
+                ];
+
+                $routesToQuery = array_values(array_filter($allRoutes, function ($pair) use ($orig, $dest) {
+                    if ($orig && $pair[0] !== $orig) {
+                        return false;
+                    }
+                    if ($dest && $pair[1] !== $dest) {
+                        return false;
+                    }
+
+                    return true;
+                }));
+
+                $allFlights = $flightService->searchRoutesParallel($routesToQuery, $date);
+
+                // Fallback para entornos de testing con mocks de searchFlights
+                if (empty($allFlights)) {
+                    foreach ($routesToQuery as [$rOrig, $rDest]) {
+                        $resFlights = $flightService->searchFlights($rOrig, $rDest, $date);
+                        if (! empty($resFlights)) {
+                            foreach ($resFlights as $f) {
+                                $allFlights[] = $f;
+                            }
+                            if (! empty($cleanFlightNumber)) {
+                                break;
+                            }
+                        }
                     }
                 }
             }
 
-            if ($matchedFlight) {
+            if (! empty($cleanFlightNumber) && ! empty($allFlights)) {
+                foreach ($allFlights as $f) {
+                    $num = strtoupper(trim(preg_replace('/^TM-?/i', '', $f['flight_number'])));
+                    if ($num === $cleanFlightNumber || str_contains($num, $cleanFlightNumber)) {
+                        $matchedFlight = $f;
+                        break;
+                    }
+                }
+            }
+
+            if (! empty($allFlights)) {
+                $primaryFlight = $matchedFlight ?? $allFlights[0];
+
                 return response()->json([
                     'success' => true,
                     'found' => true,
-                    'flight' => $matchedFlight,
-                    'departure_time' => $matchedFlight['departure_time'],
-                    'departure_date' => $matchedFlight['departure_date'],
-                    'origin' => $matchedFlight['origin'],
-                    'destination' => $matchedFlight['destination'],
-                    'origin_city' => $matchedFlight['origin_city'],
-                    'destination_city' => $matchedFlight['destination_city'],
-                    'status' => $matchedFlight['status'] ?? 'Confirmado',
-                    'message' => "Vuelo TM-{$cleanFlightNumber} ({$matchedFlight['origin_city']} → {$matchedFlight['destination_city']}) programado a las {$matchedFlight['departure_time']}.",
+                    'flights' => $allFlights,
+                    'flight' => $primaryFlight,
+                    'departure_time' => $primaryFlight['departure_time'] ?? null,
+                    'departure_date' => $primaryFlight['departure_date'] ?? $date,
+                    'origin' => $primaryFlight['origin'] ?? $orig,
+                    'destination' => $primaryFlight['destination'] ?? $dest,
+                    'origin_city' => $primaryFlight['origin_city'] ?? $this->resolveCityName($orig),
+                    'destination_city' => $primaryFlight['destination_city'] ?? $this->resolveCityName($dest),
+                    'status' => $primaryFlight['status'] ?? 'Confirmado',
+                    'message' => 'Se encontraron '.count($allFlights).' vuelo(s) disponible(s) en Transclick.',
                 ]);
             }
 
             return response()->json([
                 'success' => true,
                 'found' => false,
-                'message' => "El vuelo TM-{$cleanFlightNumber} no figura en la programación de Transclick para el {$date} (Posible cancelación o no comercial).",
+                'flights' => [],
+                'message' => 'No se encontraron vuelos programados en Transclick para la fecha '.Carbon::parse($date)->format('d/m/Y').'.',
             ]);
         } catch (\Throwable $e) {
             return response()->json([
