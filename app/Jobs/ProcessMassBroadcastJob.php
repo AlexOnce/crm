@@ -40,6 +40,13 @@ class ProcessMassBroadcastJob implements ShouldQueue
      */
     public function handle(MetaWhatsAppService $whatsapp): void
     {
+        $this->campaign->refresh();
+        if ($this->campaign->status === 'cancelled') {
+            Log::info("ProcessMassBroadcastJob: Campaña #{$this->campaign->id} cancelada antes de iniciar orquestación.");
+
+            return;
+        }
+
         Log::info("ProcessMassBroadcastJob: Iniciando campaña masiva #{$this->campaign->id} ('{$this->campaign->title}')");
 
         $this->campaign->update([
@@ -50,23 +57,48 @@ class ProcessMassBroadcastJob implements ShouldQueue
         $recipients = $this->campaign->recipients()->where('status', 'pending')->get();
 
         if ($recipients->isEmpty()) {
-            $this->campaign->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-            ]);
+            if ($this->campaign->status !== 'cancelled') {
+                $this->campaign->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+            }
 
             return;
         }
 
         $channel = $this->campaign->channel; // 'sms', 'whatsapp', 'hybrid'
 
+        $selectedLine = $this->campaign->filters['goip_line'] ?? 'both';
+        if ($selectedLine === '1' || $selectedLine === 1) {
+            $activeLines = [1];
+        } elseif ($selectedLine === '2' || $selectedLine === 2) {
+            $activeLines = [2];
+        } else {
+            $activeLines = config('services.goip.lines', [1, 2]);
+            if (empty($activeLines)) {
+                $activeLines = [1, 2];
+            }
+        }
+        $totalLines = count($activeLines);
+        $lineIndex = 0;
+
         foreach ($recipients as $recipient) {
-            $this->processRecipient($recipient, $channel, $whatsapp);
+            $this->campaign->refresh();
+            if ($this->campaign->status === 'cancelled') {
+                Log::info("ProcessMassBroadcastJob: Campaña #{$this->campaign->id} cancelada durante el procesamiento.");
+                break;
+            }
+
+            $assignedLine = $totalLines > 0 ? (int) $activeLines[$lineIndex % $totalLines] : null;
+            $lineIndex++;
+
+            $this->processRecipient($recipient, $channel, $whatsapp, $assignedLine);
         }
 
-        // Si todos fueron procesados inmediatamente (por ejemplo, vía WhatsApp sin colas SMS), verificar estado
+        // Si todos fueron procesados inmediatamente, verificar estado
         $pendingCount = $this->campaign->recipients()->whereIn('status', ['pending', 'processing'])->count();
-        if ($pendingCount === 0) {
+        if ($pendingCount === 0 && $this->campaign->status !== 'cancelled') {
             $this->campaign->update([
                 'status' => 'completed',
                 'completed_at' => now(),
@@ -80,7 +112,8 @@ class ProcessMassBroadcastJob implements ShouldQueue
     protected function processRecipient(
         BroadcastRecipient $recipient,
         string $channel,
-        MetaWhatsAppService $whatsapp
+        MetaWhatsAppService $whatsapp,
+        ?int $assignedLine = null
     ): void {
         $recipient->update(['status' => 'processing']);
 
@@ -90,7 +123,7 @@ class ProcessMassBroadcastJob implements ShouldQueue
                 $recipient->phone,
                 $recipient->message,
                 $recipient->lead_id,
-                null,
+                $assignedLine,
                 $recipient->id
             );
 
@@ -153,7 +186,7 @@ class ProcessMassBroadcastJob implements ShouldQueue
                 $recipient->phone,
                 $recipient->message,
                 $recipient->lead_id,
-                null,
+                $assignedLine,
                 $recipient->id
             );
         }

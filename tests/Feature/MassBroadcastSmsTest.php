@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessMassBroadcastJob;
+use App\Jobs\SendGoipSmsNotification;
 use App\Models\BroadcastCampaign;
 use App\Models\BroadcastRecipient;
 use App\Models\Conversation;
 use App\Models\Lead;
 use App\Models\User;
 use App\Services\FlightMicroservice;
+use App\Services\GoipSmsService;
+use App\Services\MetaWhatsAppService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -428,6 +431,8 @@ class MassBroadcastSmsTest extends TestCase
             'total_recipients' => 10,
             'status' => 'completed',
         ]);
+        $c1->created_at = '2026-10-15 10:00:00';
+        $c1->saveQuietly();
 
         $c2 = BroadcastCampaign::create([
             'user_id' => $admin->id,
@@ -458,5 +463,354 @@ class MassBroadcastSmsTest extends TestCase
         $resDate->assertStatus(200);
         $this->assertCount(1, $resDate->json('campaigns.data'));
         $this->assertEquals($c2->id, $resDate->json('campaigns.data.0.id'));
+    }
+
+    public function test_admin_can_get_goip_gateway_status(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $mockGoip = $this->createMock(GoipSmsService::class);
+        $mockGoip->method('checkGatewayHealth')->willReturn([
+            'online' => true,
+            'host' => '186.121.251.149',
+            'port' => 80,
+            'line' => 1,
+            'status_message' => 'Gateway GoIP alcanzable en red local/VPN.',
+            'latency_ms' => 45,
+            'compliance' => [
+                'hourly_sent' => 5,
+                'daily_sent' => 18,
+                'max_hourly' => 120,
+                'max_daily' => 800,
+                'safe_status' => 'safe',
+            ],
+        ]);
+        $this->app->instance(GoipSmsService::class, $mockGoip);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/admin/broadcasts/gateway-status');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'gateway' => [
+                    'online' => true,
+                    'line' => 1,
+                ],
+            ]);
+    }
+
+    public function test_admin_can_validate_entel_compliance(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        // 1. Mensaje no conforme (sin identificación y con enlace sospechoso)
+        $resNonCompliant = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/validate-compliance', [
+                'message' => 'Haga clic en bit.ly/vuelo para ver su reprogramacion.',
+            ]);
+
+        $resNonCompliant->assertStatus(200);
+        $this->assertFalse($resNonCompliant->json('compliance.compliant'));
+        $this->assertNotEmpty($resNonCompliant->json('compliance.warnings'));
+
+        // 2. Mensaje conforme con normativa ATT y Entel
+        $resCompliant = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/validate-compliance', [
+                'message' => 'TAMep Informa: Estimado pasajero, su vuelo TM-708 se encuentra confirmado.',
+            ]);
+
+        $resCompliant->assertStatus(200);
+        $this->assertTrue($resCompliant->json('compliance.compliant'));
+        $this->assertEmpty($resCompliant->json('compliance.warnings'));
+    }
+
+    public function test_admin_can_cancel_broadcast_campaign(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $campaign = BroadcastCampaign::create([
+            'user_id' => $admin->id,
+            'title' => 'Campaña a Cancelar',
+            'message' => 'TAMep Informa: Prueba cancelacion',
+            'channel' => 'sms',
+            'total_recipients' => 2,
+            'sent_count' => 0,
+            'failed_count' => 0,
+            'status' => 'processing',
+        ]);
+
+        $r1 = BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '74844348',
+            'passenger_name' => 'Pasajero 1',
+            'message' => 'TAMep Informa: Prueba cancelacion',
+            'status' => 'pending',
+        ]);
+
+        $r2 = BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '71523456',
+            'passenger_name' => 'Pasajero 2',
+            'message' => 'TAMep Informa: Prueba cancelacion',
+            'status' => 'processing',
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/admin/broadcasts/{$campaign->id}/cancel");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'cancelled_count' => 2,
+            ]);
+
+        $this->assertDatabaseHas('broadcast_campaigns', [
+            'id' => $campaign->id,
+            'status' => 'cancelled',
+        ]);
+
+        $this->assertDatabaseHas('broadcast_recipients', [
+            'id' => $r1->id,
+            'status' => 'cancelled',
+        ]);
+
+        $this->assertDatabaseHas('broadcast_recipients', [
+            'id' => $r2->id,
+            'status' => 'cancelled',
+        ]);
+    }
+
+    public function test_preview_and_store_supports_manual_passengers_with_surname(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $user->createToken('test')->plainTextToken;
+
+        // 1. Probar preview con entrada manual con apellido ("74844348 - PEREZ")
+        $previewRes = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts/preview', [
+                'message' => 'TAMep Informa: Vuelo reprogramado a las 17:00.',
+                'manual_phones' => "74844348 - PEREZ\n71234567 MAMANI",
+                'flight_number' => '707',
+            ]);
+
+        $previewRes->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'total_recipients' => 2,
+            ]);
+
+        $sampleRecipients = $previewRes->json('sample_recipients');
+        $this->assertEquals('PEREZ', $sampleRecipients[0]['passenger_name']);
+        $this->assertEquals('74844348', $sampleRecipients[0]['phone']);
+        $this->assertEquals('MAMANI', $sampleRecipients[1]['passenger_name']);
+        $this->assertEquals('71234567', $sampleRecipients[1]['phone']);
+
+        // El mensaje simulado debe incluir el apellido del primer destinatario
+        $this->assertStringStartsWith('Sr/Sra PEREZ: TAMep Informa:', $previewRes->json('sample_message'));
+
+        // 2. Probar creación de campaña con destinatario manual con apellido
+        $storeRes = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts', [
+                'title' => 'Aviso Manual Reprogramado',
+                'message' => 'TAMep Informa: Vuelo reprogramado a las 17:00.',
+                'manual_phones' => '74844348 - PEREZ',
+                'flight_number' => '707',
+            ]);
+
+        $storeRes->assertStatus(201)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('broadcast_recipients', [
+            'phone' => '74844348',
+            'passenger_name' => 'PEREZ',
+            'flight_number' => '707',
+            'status' => 'pending',
+        ]);
+
+        $recipient = BroadcastRecipient::where('phone', '74844348')->latest()->first();
+        $this->assertNotNull($recipient);
+        $this->assertStringStartsWith('Sr/Sra PEREZ: TAMep Informa:', $recipient->message);
+    }
+
+    public function test_goip_service_alternates_between_line_1_and_line_2(): void
+    {
+        config(['services.goip.lines' => [1, 2]]);
+        $service = app(GoipSmsService::class);
+
+        $lineA = $service->getNextAlternatingLine();
+        $lineB = $service->getNextAlternatingLine();
+        $lineC = $service->getNextAlternatingLine();
+        $lineD = $service->getNextAlternatingLine();
+
+        $this->assertContains($lineA, [1, 2]);
+        $this->assertContains($lineB, [1, 2]);
+        $this->assertNotEquals($lineA, $lineB);
+        $this->assertEquals($lineA, $lineC);
+        $this->assertEquals($lineB, $lineD);
+    }
+
+    public function test_process_mass_broadcast_job_interleaves_lines_between_recipients(): void
+    {
+        Queue::fake();
+        config(['services.goip.lines' => [1, 2]]);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $campaign = BroadcastCampaign::create([
+            'user_id' => $admin->id,
+            'title' => 'Campaña Intercalada Dual-SIM',
+            'message' => 'TAMep Informa: Prueba Intercalado',
+            'channel' => 'sms',
+            'total_recipients' => 4,
+            'status' => 'pending',
+        ]);
+
+        $r1 = BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '74844348',
+            'message' => 'TAMep Informa: Pasajero 1',
+            'status' => 'pending',
+        ]);
+
+        $r2 = BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '71234567',
+            'message' => 'TAMep Informa: Pasajero 2',
+            'status' => 'pending',
+        ]);
+
+        $r3 = BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '76543210',
+            'message' => 'TAMep Informa: Pasajero 3',
+            'status' => 'pending',
+        ]);
+
+        $r4 = BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '79998877',
+            'message' => 'TAMep Informa: Pasajero 4',
+            'status' => 'pending',
+        ]);
+
+        $job = new ProcessMassBroadcastJob($campaign);
+        $job->handle(app(MetaWhatsAppService::class));
+
+        // Verificar que se despacharon 4 jobs a SendGoipSmsNotification
+        Queue::assertPushed(SendGoipSmsNotification::class, 4);
+
+        // Verificar que los jobs alternaron 1, 2, 1, 2 en los slots
+        Queue::assertPushed(SendGoipSmsNotification::class, function (SendGoipSmsNotification $job) use ($r1) {
+            return $job->phone === $r1->phone && $job->line === 1;
+        });
+
+        Queue::assertPushed(SendGoipSmsNotification::class, function (SendGoipSmsNotification $job) use ($r2) {
+            return $job->phone === $r2->phone && $job->line === 2;
+        });
+
+        Queue::assertPushed(SendGoipSmsNotification::class, function (SendGoipSmsNotification $job) use ($r3) {
+            return $job->phone === $r3->phone && $job->line === 1;
+        });
+
+        Queue::assertPushed(SendGoipSmsNotification::class, function (SendGoipSmsNotification $job) use ($r4) {
+            return $job->phone === $r4->phone && $job->line === 2;
+        });
+    }
+
+    public function test_process_mass_broadcast_job_can_send_exclusively_through_port_1(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $campaign = BroadcastCampaign::create([
+            'user_id' => $admin->id,
+            'title' => 'Campaña Solo Puerto 1',
+            'message' => 'TAMep Informa: Solo Puerto 1',
+            'channel' => 'sms',
+            'filters' => ['goip_line' => '1'],
+            'total_recipients' => 2,
+            'status' => 'pending',
+        ]);
+
+        BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '74844348',
+            'message' => 'TAMep Informa: Pasajero 1',
+            'status' => 'pending',
+        ]);
+
+        BroadcastRecipient::create([
+            'campaign_id' => $campaign->id,
+            'phone' => '71234567',
+            'message' => 'TAMep Informa: Pasajero 2',
+            'status' => 'pending',
+        ]);
+
+        $job = new ProcessMassBroadcastJob($campaign);
+        $job->handle(app(MetaWhatsAppService::class));
+
+        Queue::assertPushed(SendGoipSmsNotification::class, 2);
+        Queue::assertPushed(SendGoipSmsNotification::class, function (SendGoipSmsNotification $job) {
+            return $job->line === 1;
+        });
+    }
+
+    public function test_admin_can_store_campaign_with_mixed_channel_and_specific_port(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/admin/broadcasts', [
+                'title' => 'Campaña Mixta Puerto 2',
+                'channel' => 'hybrid',
+                'goip_line' => '2',
+                'message' => 'TAMep Informa: Estimado pasajero, aviso operacional.',
+                'manual_phones' => '74844348 - FLORES',
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+                'campaign' => [
+                    'title' => 'Campaña Mixta Puerto 2',
+                    'channel' => 'hybrid',
+                ],
+            ]);
+
+        $campaign = BroadcastCampaign::where('title', 'Campaña Mixta Puerto 2')->first();
+        $this->assertNotNull($campaign);
+        $this->assertEquals('hybrid', $campaign->channel);
+        $this->assertEquals('2', $campaign->filters['goip_line']);
     }
 }

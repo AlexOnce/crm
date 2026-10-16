@@ -1504,19 +1504,39 @@
                 Avisos de Vuelo por SMS
               </h2>
               <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Envío masivo a pasajeros ante demoras o cancelaciones (Gateway GoIP)
+                Envío masivo a pasajeros ante demoras o cancelaciones
               </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <!-- Indicador de Envío y Actualización Automática en Vivo -->
+              <div 
+                v-if="isAutoBroadcasting" 
+                class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold animate-pulse"
+              >
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                <span>Enviando automáticamente... (En vivo)</span>
+              </div>
+              <div 
+                v-else 
+                class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium"
+              >
+                <CheckCircle2 class="w-3.5 h-3.5 text-emerald-500" />
+                <span>Envíos al día</span>
+              </div>
+
+              <!-- Botón Forzar Despacho Manual de Contingencia -->
               <button 
                 type="button" 
                 @click="triggerProcessQueue" 
                 :disabled="processingQueue"
-                class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                title="Fuerza un ciclo de despacho manual inmediato"
               >
                 <Loader2 v-if="processingQueue" class="w-3.5 h-3.5 animate-spin" />
-                <span>{{ processingQueue ? 'Despachando...' : 'Procesar Cola SMS' }}</span>
+                <span>{{ processingQueue ? 'Despachando...' : 'Forzar Despacho' }}</span>
               </button>
+
               <button 
                 type="button" 
                 @click="fetchBroadcastCampaigns" 
@@ -1527,6 +1547,7 @@
               </button>
             </div>
           </div>
+
 
           <!-- Formulario de Configuración y Emisión -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -1640,12 +1661,7 @@
 
                 <!-- Carga de Manifiesto Oficial de Pasajeros (PDF) -->
                 <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      <FileText class="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                      <span>Manifiesto de Pasajeros de Vuelo (PDF)</span>
-                    </span>
-                  </div>
+
 
                   <input 
                     type="file" 
@@ -1746,8 +1762,8 @@
                 </div>
               </div>
 
-              <!-- Ficha Informativa del Vuelo Detectado (Transclick o PDF) -->
-              <div v-if="flightDetectedInfo" class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+              <!-- Ficha Informativa y Modificación del Vuelo Detectado (Transclick o PDF) -->
+              <div v-if="flightDetectedInfo" class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                   <div class="flex items-center gap-2 font-mono text-xs">
                     <span class="px-2 py-0.5 rounded font-bold bg-emerald-600 text-white text-[11px]">
@@ -1768,10 +1784,22 @@
                     <span v-else-if="broadcastPreviewData" class="font-bold text-slate-700 dark:text-slate-300 text-xs">
                       {{ broadcastPreviewData.total_recipients }} Pasajeros CRM
                     </span>
+                    
+                    <!-- Botón para Modificar Datos Generales del Vuelo -->
+                    <button 
+                      type="button" 
+                      @click="showEditFlightModal = !showEditFlightModal"
+                      class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                      title="Modificar número de vuelo, horario o ruta"
+                    >
+                      <Edit3 class="w-3 h-3 text-sky-600" />
+                      <span>{{ showEditFlightModal ? 'Ocultar edición vuelo' : 'Modificar Vuelo' }}</span>
+                    </button>
+
                     <button 
                       type="button" 
                       @click="clearFlightDetected"
-                      class="px-1.5 py-0.5 text-xs text-slate-400 hover:text-red-500 transition cursor-pointer"
+                      class="px-1.5 py-1 text-xs text-slate-400 hover:text-red-500 transition cursor-pointer"
                       title="Limpiar datos de vuelo"
                     >
                       ✕
@@ -1779,26 +1807,197 @@
                   </div>
                 </div>
 
-                <!-- Mini tabla desplegable de pasajeros si vino de PDF -->
-                <div v-if="showManifestTable && importedManifest?.passengers?.length" class="max-h-48 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px]">
-                  <table class="w-full text-left">
-                    <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 font-semibold sticky top-0">
-                      <tr>
-                        <th class="p-1.5">N°</th>
-                        <th class="p-1.5">PNR</th>
-                        <th class="p-1.5">Pasajero</th>
-                        <th class="p-1.5">Celular (GoIP)</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                      <tr v-for="pax in importedManifest.passengers" :key="pax.num" class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td class="p-1.5 text-slate-400">{{ pax.num }}</td>
-                        <td class="p-1.5 font-bold text-sky-600 dark:text-sky-400">{{ pax.pnr }}</td>
-                        <td class="p-1.5 font-sans font-semibold text-slate-900 dark:text-white">{{ pax.passenger_name }}</td>
-                        <td class="p-1.5 text-emerald-600 dark:text-emerald-400 font-bold">{{ pax.phone }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <!-- Panel de Edición de Datos de Vuelo del Manifiesto -->
+                <div v-if="showEditFlightModal" class="p-3 rounded-lg bg-white dark:bg-slate-900 border border-emerald-500/40 space-y-2">
+                  <div class="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                    Modificar Parámetros Oficiales del Vuelo
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                    <div>
+                      <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">N° Vuelo</label>
+                      <input 
+                        v-model="broadcastForm.flight_number" 
+                        @input="updateFlightDetectedInfo"
+                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-xs font-mono font-bold text-slate-900 dark:text-white uppercase focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Origen</label>
+                      <select 
+                        v-model="broadcastForm.origin" 
+                        @change="updateFlightDetectedInfo"
+                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-1.5 py-1 text-xs font-bold text-slate-900 dark:text-white focus:border-sky-500 focus:outline-none"
+                      >
+                        <option v-for="apt in broadcastAirports" :key="apt.code" :value="apt.code">{{ apt.city }} ({{ apt.code }})</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Destino</label>
+                      <select 
+                        v-model="broadcastForm.destination" 
+                        @change="updateFlightDetectedInfo"
+                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-1.5 py-1 text-xs font-bold text-slate-900 dark:text-white focus:border-sky-500 focus:outline-none"
+                      >
+                        <option v-for="apt in broadcastAirports" :key="apt.code" :value="apt.code">{{ apt.city }} ({{ apt.code }})</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Fecha Vuelo</label>
+                      <input 
+                        v-model="broadcastForm.flight_date" 
+                        type="date"
+                        @change="updateFlightDetectedInfo"
+                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-xs font-mono text-slate-900 dark:text-white focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Hora Salida</label>
+                      <input 
+                        v-model="broadcastForm.flight_time" 
+                        placeholder="15:30"
+                        @input="updateFlightDetectedInfo"
+                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-xs font-mono font-bold text-slate-900 dark:text-white focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tabla Interactiva y Editable de Pasajeros del Manifiesto -->
+                <div v-if="showManifestTable && (broadcastForm.manifest_passengers?.length || importedManifest?.passengers?.length)" class="space-y-2">
+                  <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div class="relative flex-1 max-w-xs">
+                      <Search class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        v-model="manifestSearchQuery"
+                        type="text"
+                        placeholder="Buscar en manifiesto..."
+                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-8 pr-2.5 py-1 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <span class="text-[11px] text-slate-500 font-mono">
+                        {{ filteredManifestPassengers.length }} de {{ broadcastForm.manifest_passengers.length }} pasajeros
+                      </span>
+                      <button 
+                        type="button" 
+                        @click="addManifestPassenger"
+                        class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-xs"
+                      >
+                        <Plus class="w-3.5 h-3.5" />
+                        <span>Agregar Pasajero</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="max-h-60 overflow-y-auto overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px]">
+                    <table class="w-full text-left">
+                      <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 font-semibold sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <th class="p-1.5 w-10 text-center">N°</th>
+                          <th class="p-1.5 w-20">PNR</th>
+                          <th class="p-1.5">Pasajero</th>
+                          <th class="p-1.5 w-36">Celular (GoIP)</th>
+                          <th class="p-1.5 w-24 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                        <tr 
+                          v-for="(pax, idx) in filteredManifestPassengers" 
+                          :key="pax.num || idx" 
+                          class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td class="p-1.5 text-center text-slate-400 text-[10px]">{{ idx + 1 }}</td>
+                          
+                          <!-- PNR -->
+                          <td class="p-1.5 font-bold text-sky-600 dark:text-sky-400">
+                            <input 
+                              v-if="editingManifestIndex === idx" 
+                              v-model="pax.pnr" 
+                              class="w-16 bg-white dark:bg-slate-800 border border-sky-400 rounded px-1.5 py-0.5 text-xs font-mono font-bold uppercase focus:outline-none" 
+                            />
+                            <span v-else>{{ pax.pnr || 'N/A' }}</span>
+                          </td>
+
+                          <!-- Pasajero -->
+                          <td class="p-1.5 font-sans font-semibold text-slate-900 dark:text-white">
+                            <input 
+                              v-if="editingManifestIndex === idx" 
+                              v-model="pax.passenger_name" 
+                              placeholder="Nombre y Apellido"
+                              class="w-full bg-white dark:bg-slate-800 border border-sky-400 rounded px-1.5 py-0.5 text-xs font-sans font-semibold uppercase focus:outline-none" 
+                            />
+                            <span v-else>{{ pax.passenger_name }}</span>
+                          </td>
+
+                          <!-- Celular (GoIP) -->
+                          <td class="p-1.5 font-mono">
+                            <div v-if="editingManifestIndex === idx" class="flex items-center gap-1">
+                              <input 
+                                v-model="pax.phone" 
+                                maxlength="12" 
+                                placeholder="Ej: 74844348"
+                                class="w-28 bg-white dark:bg-slate-800 border border-sky-400 rounded px-1.5 py-0.5 text-xs font-mono font-bold focus:outline-none" 
+                              />
+                            </div>
+                            <div v-else class="flex items-center gap-1">
+                              <span v-if="(pax.phone || '').replace(/\D/g, '').length >= 8" class="text-emerald-600 dark:text-emerald-400 font-bold">
+                                {{ pax.phone }}
+                              </span>
+                              <span v-else class="text-amber-500 text-[10px] font-sans font-semibold flex items-center gap-0.5" title="Sin celular válido">
+                                <AlertTriangle class="w-3 h-3" /> Sin celular
+                              </span>
+                            </div>
+                          </td>
+
+                          <!-- Acciones -->
+                          <td class="p-1.5 text-right whitespace-nowrap">
+                            <div v-if="editingManifestIndex === idx" class="flex items-center justify-end gap-1">
+                              <button 
+                                type="button" 
+                                @click="saveManifestPassenger(idx)" 
+                                class="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[10px] cursor-pointer hover:bg-emerald-500 shadow-2xs" 
+                                title="Guardar cambios"
+                              >
+                                ✓ Guardar
+                              </button>
+                              <button 
+                                type="button" 
+                                @click="cancelEditManifestPassenger()" 
+                                class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] cursor-pointer" 
+                                title="Cancelar"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div v-else class="flex items-center justify-end gap-1">
+                              <button 
+                                type="button" 
+                                @click="startEditManifestPassenger(idx)" 
+                                class="p-1 text-slate-400 hover:text-sky-600 transition cursor-pointer" 
+                                title="Editar pasajero"
+                              >
+                                <Edit3 class="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                type="button" 
+                                @click="deleteManifestPassenger(idx)" 
+                                class="p-1 text-slate-400 hover:text-rose-500 transition cursor-pointer" 
+                                title="Eliminar del manifiesto"
+                              >
+                                <Trash2 class="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr v-if="filteredManifestPassengers.length === 0">
+                          <td colspan="5" class="p-4 text-center text-slate-400 font-sans">
+                            No se encontraron pasajeros en el manifiesto con ese filtro.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
@@ -1865,23 +2064,119 @@
                 </div>
               </div>
 
-              <!-- Números Adicionales Opcionales -->
-              <div class="pt-1">
-                <button 
-                  type="button" 
-                  @click="showManualPhones = !showManualPhones"
-                  class="text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer font-semibold"
-                >
-                  {{ showManualPhones ? 'Ocultar números adicionales' : '+ Agregar números de celular adicionales manualmente (opcional)' }}
-                </button>
+              <!-- Registro Manual de Pasajeros (Apellido + Celular) -->
+              <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <button 
+                    type="button" 
+                    @click="showManualPhones = !showManualPhones"
+                    class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:text-sky-500 cursor-pointer flex items-center gap-1.5 transition"
+                  >
+                    <Plus v-if="!showManualPhones" class="w-3.5 h-3.5" />
+                    <ChevronDown v-else class="w-3.5 h-3.5" />
+                    <span>{{ showManualPhones ? 'Ocultar registro manual de pasajeros' : 'Registrar pasajeros adicionales manualmente (Apellido y Celular)' }}</span>
+                    <span v-if="parsedManualRecipients.length" class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-mono font-bold">
+                      {{ parsedManualRecipients.length }}
+                    </span>
+                  </button>
 
-                <div v-if="showManualPhones" class="mt-2">
-                  <textarea 
-                    v-model="broadcastForm.manual_phones"
-                    rows="2"
-                    placeholder="74844348, 71234567..."
-                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
-                  ></textarea>
+
+                </div>
+
+                <div v-if="showManualPhones" class="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <!-- Formulario Rápido de 1 Clic para Agregar Pasajero -->
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Agregar Pasajero Manual:
+                    </label>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div class="relative flex-1">
+                        <input 
+                          v-model="manualPassengerInput.surname"
+                          type="text"
+                          placeholder="Apellido del pasajero (ej: PEREZ, MAMANI)"
+                          @keydown.enter.prevent="addManualPassengerRow"
+                          class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 uppercase placeholder:normal-case font-sans"
+                        />
+                      </div>
+                      <div class="relative sm:w-44">
+                        <input 
+                          v-model="manualPassengerInput.phone"
+                          type="text"
+                          maxlength="8"
+                          placeholder="Celular (ej: 74844348)"
+                          @keydown.enter.prevent="addManualPassengerRow"
+                          class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
+                        />
+                      </div>
+                      <button 
+                        type="button"
+                        @click="addManualPassengerRow"
+                        class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer shadow-xs whitespace-nowrap"
+                      >
+                        <Plus class="w-3.5 h-3.5" />
+                        <span>Agregar</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Lista de Pasajeros Manuales Agregados -->
+                  <div v-if="parsedManualRecipients.length" class="space-y-1.5">
+                    <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                      <span>Pasajeros manuales ingresados ({{ parsedManualRecipients.length }}):</span>
+                      <button 
+                        type="button" 
+                        @click="broadcastForm.manual_phones = ''; if (broadcastPreviewData) fetchBroadcastPreview();"
+                        class="text-[10px] text-rose-500 hover:underline cursor-pointer"
+                      >
+                        Limpiar todos
+                      </button>
+                    </div>
+
+                    <div class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <span 
+                        v-for="(pax, idx) in parsedManualRecipients" 
+                        :key="idx"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-sans"
+                      >
+                        <strong class="text-sky-700 dark:text-sky-300 font-bold uppercase">{{ pax.surname }}</strong>
+                        <span class="text-slate-400">·</span>
+                        <span class="font-mono text-slate-600 dark:text-slate-300">{{ pax.phone }}</span>
+                        <button 
+                          type="button" 
+                          @click="removeManualPassengerAt(idx)" 
+                          class="ml-0.5 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                          title="Eliminar pasajero"
+                        >
+                          <X class="w-3 h-3" />
+                        </button>
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Opción Desplegable para Pegar Lotes de Texto -->
+                  <div class="pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
+                    <button 
+                      type="button"
+                      @click="showBulkManualInput = !showBulkManualInput"
+                      class="text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer flex items-center gap-1"
+                    >
+                      <span>{{ showBulkManualInput ? 'Ocultar editor de texto por lote' : 'O pegar varios en lote (formato texto libre)' }}</span>
+                      <ChevronDown class="w-3 h-3 transform transition-transform" :class="showBulkManualInput ? 'rotate-180' : ''" />
+                    </button>
+
+                    <div v-if="showBulkManualInput" class="mt-2 space-y-1">
+                      <textarea 
+                        v-model="broadcastForm.manual_phones"
+                        rows="3"
+                        placeholder="74844348 - PEREZ&#10;71234567 - MAMANI&#10;76543210 (o solo número)"
+                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
+                      ></textarea>
+                      <p class="text-[10px] text-slate-400">
+                        Puedes pegar líneas en formato: <code class="px-1 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">74844348 - PEREZ</code> o <code class="px-1 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">PEREZ, 74844348</code> o solo el número.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1903,11 +2198,16 @@
               <div v-if="broadcastPreviewData" class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <div class="text-xs font-bold text-slate-900 dark:text-white">
-                      {{ broadcastPreviewData.total_recipients }} Celular(es) Destinatario(s)
+                    <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>{{ broadcastPreviewData.total_recipients }} Celular(es) Destinatario(s)</span>
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        Listos para envío
+                      </span>
                     </div>
                     <div class="text-[11px] text-slate-500">
-                      Tiempo estimado: ~{{ Math.ceil((broadcastPreviewData.total_recipients * 15) / 60) }} min (a 15s por SMS)
+                      Tiempo estimado: ~{{ Math.ceil((broadcastPreviewData.total_recipients * (broadcastForm.goip_line === 'both' ? 7.5 : 15)) / 60) }} min 
+                      <span class="text-emerald-600 dark:text-emerald-400 font-semibold" v-if="broadcastForm.goip_line === 'both'">(2X más rápido: ~7.5s por SMS intercalando)</span>
+                      <span class="text-slate-400" v-else>(a 15s por SMS en un solo chip)</span>
                     </div>
                   </div>
 
@@ -1921,30 +2221,101 @@
                   </div>
                 </div>
 
-                <!-- Tabla resumen de pasajeros (primeros 5) -->
-                <div v-if="broadcastPreviewData.sample_recipients?.length" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                  <table class="w-full text-[11px] text-left">
-                    <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold uppercase">
-                      <tr>
-                        <th class="p-2">Pasajero</th>
-                        <th class="p-2">Teléfono</th>
-                        <th class="p-2">Vuelo</th>
-                        <th class="p-2">PNR</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300 font-mono">
-                      <tr v-for="pax in broadcastPreviewData.sample_recipients.slice(0, 5)" :key="pax.phone">
-                        <td class="p-2 font-sans font-semibold">{{ pax.passenger_name }}</td>
-                        <td class="p-2">{{ pax.phone }}</td>
-                        <td class="p-2">{{ pax.flight_number || 'N/A' }}</td>
-                        <td class="p-2">{{ pax.booking_reference || 'N/A' }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <!-- Buscador rápido y contador -->
+                <div class="flex items-center justify-between gap-2 pt-1">
+                  <div class="relative flex-1 max-w-sm">
+                    <Search class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      v-model="previewSearchQuery"
+                      type="text"
+                      placeholder="Buscar por pasajero, teléfono o PNR..."
+                      class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 placeholder:text-slate-400"
+                    />
+                  </div>
+                  <span class="text-[11px] text-slate-500 font-mono">
+                    Mostrando {{ filteredPreviewRecipients.length }} de {{ broadcastPreviewData.total_recipients }}
+                  </span>
                 </div>
 
-                <!-- Botón de Disparo Principal -->
-                <div class="pt-2 flex items-center justify-end">
+                <!-- Tabla Completa de Destinatarios con Scroll Vertical Fluido -->
+                <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+                  <div class="max-h-72 sm:max-h-80 overflow-y-auto overflow-x-auto">
+                    <table class="w-full text-[11px] text-left">
+                      <thead class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold uppercase sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 shadow-2xs">
+                        <tr>
+                          <th class="p-2.5 text-center w-10">#</th>
+                          <th class="p-2.5">Pasajero</th>
+                          <th class="p-2.5">Teléfono</th>
+                          <th class="p-2.5">Puerto GoIP</th>
+                          <th class="p-2.5">Vuelo</th>
+                          <th class="p-2.5">Ruta</th>
+                          <th class="p-2.5">PNR</th>
+                          <th class="p-2.5 text-center w-16">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                        <tr 
+                          v-for="(pax, idx) in filteredPreviewRecipients" 
+                          :key="pax.phone + (pax.booking_reference || idx)" 
+                          class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                        >
+                          <td class="p-2.5 text-center text-slate-400 font-sans text-[10px]">{{ idx + 1 }}</td>
+                          <td class="p-2.5 font-sans font-semibold text-slate-900 dark:text-white">
+                            {{ pax.passenger_name }}
+                          </td>
+                          <td class="p-2.5 font-bold text-emerald-600 dark:text-emerald-400">
+                            {{ pax.phone }}
+                          </td>
+                          <td class="p-2.5">
+                            <span 
+                              class="px-2 py-0.5 rounded text-[10px] font-bold font-sans inline-flex items-center gap-1"
+                              :class="pax.assigned_line === 2 || (!pax.assigned_line && idx % 2 === 1) ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'"
+                            >
+                              <span class="w-1.5 h-1.5 rounded-full" :class="pax.assigned_line === 2 || (!pax.assigned_line && idx % 2 === 1) ? 'bg-purple-500' : 'bg-indigo-500'"></span>
+                              {{ pax.assigned_port_label || ('Puerto ' + (idx % 2 === 0 ? 1 : 2)) }}
+                            </span>
+                          </td>
+                          <td class="p-2.5">{{ pax.flight_number || 'N/A' }}</td>
+                          <td class="p-2.5 text-[10px] text-slate-500">
+                            {{ pax.origin && pax.destination ? `${pax.origin}→${pax.destination}` : 'N/A' }}
+                          </td>
+                          <td class="p-2.5 font-bold text-sky-600 dark:text-sky-400">
+                            {{ pax.booking_reference || 'N/A' }}
+                          </td>
+                          <td class="p-2.5 text-center">
+                            <button 
+                              type="button" 
+                              @click="excludeRecipientFromPreview(pax)"
+                              class="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                              title="Excluir este pasajero del envío"
+                            >
+                              <X class="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                        <tr v-if="filteredPreviewRecipients.length === 0">
+                          <td colspan="8" class="p-6 text-center text-slate-400 font-sans">
+                            No se encontraron pasajeros que coincidan con la búsqueda.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Opciones de Despacho y Anti-Baneo -->
+                <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800">
+                  <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 dark:text-slate-300">
+                    <input 
+                      type="checkbox" 
+                      v-model="broadcastForm.dispatch_immediate" 
+                      class="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                    />
+                    <span class="font-semibold">Auto-despachar inmediatamente</span>
+                    <span class="text-[10px] text-slate-400 font-normal">(sin esperar cola manual)</span>
+                  </label>
+
+                  <!-- Botón de Disparo Principal -->
                   <button 
                     type="button" 
                     @click="submitBroadcastCampaign" 
@@ -1955,6 +2326,29 @@
                     <span>Iniciar Envío Masivo a {{ broadcastPreviewData.total_recipients }} Pasajero(s)</span>
                   </button>
                 </div>
+
+                <!-- Tarjeta de Cumplimiento Normativo Entel y Dual-SIM GoIP -->
+                <div class="p-2.5 rounded-xl bg-sky-50/60 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 flex items-start gap-2.5 text-[11px] text-sky-800 dark:text-sky-300">
+                  <ShieldCheck class="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+                  <div class="space-y-0.5">
+                    <div class="font-bold flex items-center gap-1.5 flex-wrap">
+                      <span v-if="broadcastForm.goip_line === 'both'">Intercalado Dual-SIM GoIP Activo (Puertos 1 y 2)</span>
+                      <span v-else>Salida Exclusiva por GoIP Puerto {{ broadcastForm.goip_line }}</span>
+
+                      <span v-if="broadcastForm.goip_line === 'both' || broadcastForm.goip_line === '1'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">Puerto 1</span>
+                      <span v-if="broadcastForm.goip_line === 'both'" class="text-slate-400 text-[10px]">⇄</span>
+                      <span v-if="broadcastForm.goip_line === 'both' || broadcastForm.goip_line === '2'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">Puerto 2</span>
+                    </div>
+                    <p class="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+                      <span v-if="broadcastForm.goip_line === 'both'">
+                        Los envíos se alternan automáticamente 50/50 entre ambas líneas a ~7.5s por despacho (2X más rápido en total), manteniendo intervalos reales de 15 a 20s de reposo en cada chip para máxima protección contra baneos de Entel / ATT.
+                      </span>
+                      <span v-else>
+                        Los mensajes se transmitirán únicamente por el Puerto {{ broadcastForm.goip_line }} con pausas dinámicas de 12 a 22s y enfriamiento GSM anti-baneo.
+                      </span>
+                    </p>
+                  </div>
+                </div>
               </div>
 
             </div>
@@ -1964,11 +2358,62 @@
               
               <div class="pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  3. Mensaje SMS a Transmitir
+                  3. Puerto de Salida GoIP y Mensaje
                 </h3>
                 <span class="text-[11px] font-mono" :class="smsCostClass">
                   {{ smsCharCount }} caracteres ({{ smsSegmentCount }} SMS)
                 </span>
+              </div>
+
+              <!-- Selector de Puerto de Salida GoIP (Líneas SIM) -->
+              <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                <div class="flex items-center justify-between mb-0.5">
+                  <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Puerto de Salida GoIP (SIM):
+                  </label>
+                  <span class="text-[10px] font-mono text-slate-500">
+                    {{ broadcastForm.goip_line === 'both' ? 'Intercalado (1 y 2)' : ('Solo Puerto ' + broadcastForm.goip_line) }}
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 text-center">
+                  <button
+                    type="button"
+                    @click="broadcastForm.goip_line = 'both'; onPortChange();"
+                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5"
+                    :class="broadcastForm.goip_line === 'both' 
+                      ? 'bg-sky-500/15 border-sky-500 text-sky-700 dark:text-sky-300 font-extrabold shadow-2xs' 
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-sky-300'"
+                  >
+                    <span>Ambos (1 y 2)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="broadcastForm.goip_line = '1'; onPortChange();"
+                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5"
+                    :class="broadcastForm.goip_line === '1' 
+                      ? 'bg-indigo-500/15 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-extrabold shadow-2xs' 
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-indigo-300'"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                    <span>Puerto 1</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="broadcastForm.goip_line = '2'; onPortChange();"
+                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5"
+                    :class="broadcastForm.goip_line === '2' 
+                      ? 'bg-purple-500/15 border-purple-500 text-purple-700 dark:text-purple-300 font-extrabold shadow-2xs' 
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-purple-300'"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                    <span>Puerto 2</span>
+                  </button>
+                </div>
+
+
               </div>
 
               <!-- Textarea del SMS -->
@@ -1983,6 +2428,21 @@
                   placeholder="Escribe el mensaje SMS para los pasajeros..."
                   class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono leading-relaxed"
                 ></textarea>
+              </div>
+
+              <!-- Alertas de Normativas ATT / Entel en Vivo -->
+              <div v-if="!messageCompliance.hasIdentity" class="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                <AlertTriangle class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Recomendación ATT / Entel:</strong> Inicie con <code class="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded">TAMep Informa:</code> o <code class="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded">EPTAM:</code>. Los envíos anónimos activan filtros anti-spam de la operadora.
+                </div>
+              </div>
+
+              <div v-if="messageCompliance.hasShortener" class="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 text-[11px] text-red-800 dark:text-red-300 flex items-start gap-2">
+                <AlertCircle class="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Alerta de Bloqueo Inmediato:</strong> No use enlaces acortados (bit.ly, tinyurl). Entel suspende automáticamente líneas que difunden enlaces de acortador.
+                </div>
               </div>
 
               <!-- Botones para Insertar Etiquetas Dinámicas -->
@@ -2117,8 +2577,24 @@
                       <div class="text-[10px] text-slate-400">{{ formatBroadcastDate(c.created_at) }}</div>
                     </td>
                     <td class="p-3">
-                      <div class="font-bold text-slate-900 dark:text-white">{{ c.title }}</div>
-                      <div class="text-[11px] text-slate-500 truncate max-w-xs">{{ c.message }}</div>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="font-bold text-slate-900 dark:text-white">{{ c.title }}</span>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+                          SMS GoIP
+                        </span>
+
+                        <!-- Badge Puerto GoIP -->
+                        <span v-if="c.filters?.goip_line === '1'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                          Puerto 1
+                        </span>
+                        <span v-else-if="c.filters?.goip_line === '2'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                          Puerto 2
+                        </span>
+                        <span v-else class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
+                          Puertos 1 y 2
+                        </span>
+                      </div>
+                      <div class="text-[11px] text-slate-500 truncate max-w-xs mt-0.5">{{ c.message }}</div>
                     </td>
                     <td class="p-3 font-mono">
                       <span class="font-bold text-slate-900 dark:text-white">{{ c.total_recipients }}</span> pasajeros
@@ -2145,14 +2621,24 @@
                         :class="[
                           c.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
                           c.status === 'processing' ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20' :
+                          c.status === 'cancelled' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
                           'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                         ]"
                       >
-                        {{ c.status === 'completed' ? 'Completado' : (c.status === 'processing' ? 'En cola GoIP' : 'Pendiente') }}
+                        {{ c.status === 'completed' ? 'Completado' : (c.status === 'processing' ? 'En cola GoIP' : (c.status === 'cancelled' ? 'Cancelado' : 'Pendiente')) }}
                       </span>
                     </td>
                     <td class="p-3 text-right">
                       <div class="flex items-center justify-end gap-1.5">
+                        <button 
+                          v-if="['processing', 'pending'].includes(c.status)"
+                          type="button" 
+                          @click="cancelBroadcastCampaign(c)"
+                          class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 text-xs font-semibold transition cursor-pointer"
+                          title="Detiene el envío de mensajes pendientes"
+                        >
+                          Cancelar
+                        </button>
                         <button 
                           type="button" 
                           @click="openCampaignDetails(c)"
@@ -2161,10 +2647,10 @@
                           Ver detalle
                         </button>
                         <button 
-                          v-if="c.failed_count > 0"
+                          v-if="c.failed_count > 0 && c.status !== 'cancelled'"
                           type="button" 
                           @click="retryFailedCampaign(c)"
-                          class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 text-xs font-semibold transition cursor-pointer"
+                          class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 text-xs font-semibold transition cursor-pointer"
                         >
                           Reintentar
                         </button>
@@ -2173,6 +2659,46 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Controles de Paginación del Historial -->
+            <div 
+              v-if="broadcastCampaigns.length" 
+              class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs"
+            >
+              <div class="text-slate-500 dark:text-slate-400 text-[11px]">
+                Mostrando <strong class="font-bold text-slate-800 dark:text-slate-200">{{ broadcastPagination.from }}</strong> a 
+                <strong class="font-bold text-slate-800 dark:text-slate-200">{{ broadcastPagination.to }}</strong> de 
+                <strong class="font-bold text-slate-800 dark:text-slate-200">{{ broadcastPagination.total }}</strong> campañas registradas
+              </div>
+
+              <div v-if="broadcastPagination.last_page > 1" class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  :disabled="broadcastPagination.current_page <= 1 || broadcastLoading"
+                  @click="changeBroadcastPage(broadcastPagination.current_page - 1)"
+                  class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-1 font-medium"
+                >
+                  <ChevronLeft class="w-3.5 h-3.5" />
+                  <span>Anterior</span>
+                </button>
+
+                <div class="flex items-center gap-1 px-1">
+                  <span class="text-[11px] font-mono text-slate-500">
+                    Página <strong class="text-slate-900 dark:text-white">{{ broadcastPagination.current_page }}</strong> de <strong class="text-slate-900 dark:text-white">{{ broadcastPagination.last_page }}</strong>
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  :disabled="broadcastPagination.current_page >= broadcastPagination.last_page || broadcastLoading"
+                  @click="changeBroadcastPage(broadcastPagination.current_page + 1)"
+                  class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-1 font-medium"
+                >
+                  <span>Siguiente</span>
+                  <ChevronRight class="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             <!-- Estado Vacío -->
@@ -2833,30 +3359,91 @@
                     </span>
                   </td>
                   <td class="p-2.5 text-[11px]">
-                    <span v-if="r.gateway_message_id" class="text-emerald-600 dark:text-emerald-400 font-bold">
-                      ID:{{ r.gateway_message_id }}
-                    </span>
-                    <span v-else-if="r.error_message" class="text-red-500" :title="r.error_message">
-                      {{ r.error_message.substring(0, 30) }}...
-                    </span>
-                    <span v-else class="text-slate-400">-</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span 
+                        v-if="r.channel_used === 'sms_l1' || (r.gateway_message_id && r.gateway_message_id.startsWith('L1:'))" 
+                        class="px-1.5 py-0.5 rounded text-[10px] font-bold font-sans bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 inline-flex items-center gap-1"
+                        title="Enviado a través de la Línea/Puerto 1 de GoIP"
+                      >
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                        Puerto 1
+                      </span>
+                      <span 
+                        v-else-if="r.channel_used === 'sms_l2' || (r.gateway_message_id && r.gateway_message_id.startsWith('L2:'))" 
+                        class="px-1.5 py-0.5 rounded text-[10px] font-bold font-sans bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center gap-1"
+                        title="Enviado a través de la Línea/Puerto 2 de GoIP"
+                      >
+                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                        Puerto 2
+                      </span>
+                      <span v-if="r.gateway_message_id" class="text-emerald-600 dark:text-emerald-400 font-bold">
+                        ID:{{ r.gateway_message_id }}
+                      </span>
+                      <span v-else-if="r.error_message" class="text-red-500" :title="r.error_message">
+                        {{ r.error_message.substring(0, 30) }}...
+                      </span>
+                      <span v-else class="text-slate-400">-</span>
+                    </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Botón de Cerrar y Reintentar -->
+          <!-- Paginación de Pasajeros en Modal de Detalle -->
+          <div 
+            v-if="broadcastDetailModal.recipients.length && broadcastDetailModal.pagination && broadcastDetailModal.pagination.last_page > 1" 
+            class="flex items-center justify-between pt-2 text-xs"
+          >
+            <div class="text-[11px] text-slate-500">
+              Mostrando {{ broadcastDetailModal.pagination.from }} - {{ broadcastDetailModal.pagination.to }} de {{ broadcastDetailModal.pagination.total }} pasajeros
+            </div>
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                :disabled="broadcastDetailModal.pagination.current_page <= 1 || broadcastDetailModal.loading"
+                @click="changeCampaignDetailsPage(broadcastDetailModal.pagination.current_page - 1)"
+                class="px-2 py-1 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 text-xs cursor-pointer flex items-center gap-0.5"
+              >
+                <ChevronLeft class="w-3 h-3" />
+                <span>Ant</span>
+              </button>
+              <span class="text-[11px] font-mono px-1 text-slate-500">
+                {{ broadcastDetailModal.pagination.current_page }} / {{ broadcastDetailModal.pagination.last_page }}
+              </span>
+              <button
+                type="button"
+                :disabled="broadcastDetailModal.pagination.current_page >= broadcastDetailModal.pagination.last_page || broadcastDetailModal.loading"
+                @click="changeCampaignDetailsPage(broadcastDetailModal.pagination.current_page + 1)"
+                class="px-2 py-1 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 text-xs cursor-pointer flex items-center gap-0.5"
+              >
+                <span>Sig</span>
+                <ChevronRight class="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Botón de Cerrar, Cancelar y Reintentar -->
           <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
-            <button 
-              v-if="broadcastDetailModal.campaign?.failed_count > 0"
-              type="button" 
-              @click="retryFailedCampaign(broadcastDetailModal.campaign)"
-              class="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition cursor-pointer"
-            >
-              Reintentar {{ broadcastDetailModal.campaign.failed_count }} Fallidos
-            </button>
-            <div v-else></div>
+            <div class="flex items-center gap-2">
+              <button 
+                v-if="['processing', 'pending'].includes(broadcastDetailModal.campaign?.status)"
+                type="button" 
+                @click="cancelBroadcastCampaign(broadcastDetailModal.campaign)"
+                class="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>Detener y Cancelar Envío</span>
+              </button>
+
+              <button 
+                v-if="broadcastDetailModal.campaign?.failed_count > 0 && broadcastDetailModal.campaign?.status !== 'cancelled'"
+                type="button" 
+                @click="retryFailedCampaign(broadcastDetailModal.campaign)"
+                class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition cursor-pointer"
+              >
+                Reintentar {{ broadcastDetailModal.campaign.failed_count }} Fallidos
+              </button>
+            </div>
 
             <button 
               type="button" 
@@ -2890,7 +3477,8 @@ import {
   ArrowRight, Download, BellRing, BellOff, Bell, Lock, Loader2, CheckCircle2,
   AlertCircle, AlertTriangle, X, CalendarDays, Upload, Globe, ExternalLink,
   FileText, Check, Plus, Clock, UserCheck, Edit3, Trash2,
-  Bot, RotateCcw, Sparkles, Copy, Save, ChevronDown, Send
+  Bot, RotateCcw, Sparkles, Copy, Save, ChevronDown, Send,
+  ChevronLeft, ChevronRight
 } from 'lucide-vue-next';
 import logoImg from '../../images/logo.jpg';
 import UserProfileModal from '@/components/profile/UserProfileModal.vue';
@@ -2928,7 +3516,7 @@ const tabs = computed(() => [
     icon: Users,
     badge: ticketCounts.value.nuevo > 0 ? ticketCounts.value.nuevo : undefined,
   },
-  { id: 'broadcasts', label: 'Avisos SMS (GoIP)', icon: Radio },
+  { id: 'broadcasts', label: 'Avisos SMS', icon: Radio },
   { id: 'agents', label: 'Agentes', icon: Users },
   { id: 'monitor', label: 'Monitoreo', icon: MessageSquare },
   { id: 'bot_messages', label: 'Mensajes Bot', icon: Bot },
@@ -3068,6 +3656,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval);
+  stopAutoBroadcastEngine();
   window.removeEventListener('focus', onWindowFocus);
   if (window.Echo) {
     try {
@@ -3086,7 +3675,14 @@ watch(activeTab, (newTab) => {
     fetchTickets();
     fetchMetrics();
   } else if (newTab === 'broadcasts') {
-    fetchBroadcastCampaigns();
+    fetchBroadcastCampaigns().then(() => {
+      // Auto-iniciar motor en vivo si hay campañas en proceso o pendientes
+      const hasActive = broadcastCampaigns.value.some(c => ['processing', 'pending'].includes(c.status));
+      if (hasActive) {
+        startAutoBroadcastEngine();
+      }
+    });
+    fetchGatewayStatus();
   } else if (newTab === 'agents') {
     fetchMetrics();
   } else if (newTab === 'monitor') {
@@ -3755,6 +4351,14 @@ const broadcastAirports = [
 
 const availableFlightsList = ref([]);
 const broadcastCampaigns = ref([]);
+const broadcastPagination = ref({
+  current_page: 1,
+  last_page: 1,
+  total: 0,
+  from: 0,
+  to: 0,
+  per_page: 15,
+});
 const broadcastFilters = ref({
   flight_number: '',
   date: '',
@@ -3774,6 +4378,8 @@ const smsTemplates = {
 
 const broadcastForm = ref({
   title: '',
+  channel: 'sms',
+  goip_line: 'both', // 'both', '1', '2'
   flight_number: '',
   flight_date: new Date().toISOString().split('T')[0],
   flight_time: '',
@@ -3784,18 +4390,115 @@ const broadcastForm = ref({
   template_type: 'flight_delay',
   message: smsTemplates.flight_delay,
   manifest_passengers: [],
+  dispatch_immediate: true,
 });
+
+function onPortChange() {
+  if (broadcastPreviewData.value) {
+    fetchBroadcastPreview();
+  }
+}
 
 const verifyingFlight = ref(false);
 const processingQueue = ref(false);
 const flightDetectedInfo = ref(null);
 const showManualPhones = ref(false);
+const showBulkManualInput = ref(false);
+const manualPassengerInput = ref({
+  surname: '',
+  phone: '',
+});
+
+const parsedManualRecipients = computed(() => {
+  const raw = (broadcastForm.value.manual_phones || '').trim();
+  if (!raw) return [];
+  const lines = raw.split(/[\r\n;]+/).map(l => l.trim()).filter(Boolean);
+  const result = [];
+  for (const line of lines) {
+    const match = line.match(/(?:\+?591[\s\-]*)?([67]\d{7}|\d{8,12})/);
+    if (match) {
+      const phone = match[1].replace(/\D/g, '');
+      let namePart = line.replace(match[0], '').replace(/[\s\-,;:\/|]+/g, ' ').trim();
+      result.push({
+        phone,
+        surname: namePart ? namePart.toUpperCase() : 'Pasajero',
+        raw: line,
+      });
+    }
+  }
+  return result;
+});
+
+function addManualPassengerRow() {
+  const phone = (manualPassengerInput.value.phone || '').replace(/\D/g, '');
+  if (phone.length < 8) {
+    showToast('Ingresa un número de celular válido de al menos 8 dígitos.', 'warning');
+    return;
+  }
+  const surname = (manualPassengerInput.value.surname || '').trim().toUpperCase() || 'Pasajero';
+  const entry = `${phone} - ${surname}`;
+  
+  const current = (broadcastForm.value.manual_phones || '').trim();
+  if (current) {
+    broadcastForm.value.manual_phones = `${current}\n${entry}`;
+  } else {
+    broadcastForm.value.manual_phones = entry;
+  }
+  manualPassengerInput.value.surname = '';
+  manualPassengerInput.value.phone = '';
+  showToast(`Pasajero ${surname} (${phone}) agregado.`, 'success');
+  
+  if (broadcastPreviewData.value) {
+    fetchBroadcastPreview();
+  }
+}
+
+function removeManualPassengerAt(index) {
+  const lines = (broadcastForm.value.manual_phones || '')
+    .split(/[\r\n;]+/)
+    .map(l => l.trim())
+    .filter(Boolean);
+  if (index >= 0 && index < lines.length) {
+    lines.splice(index, 1);
+    broadcastForm.value.manual_phones = lines.join('\n');
+    if (broadcastPreviewData.value) {
+      fetchBroadcastPreview();
+    }
+  }
+}
+
+const gatewayStatus = ref({
+  loading: false,
+  online: true,
+  data: null,
+});
+
+const isAutoBroadcasting = ref(false);
+let autoBroadcastTimer = null;
+
+const messageCompliance = computed(() => {
+  const msg = (broadcastForm.value.message || '').toLowerCase();
+  const hasIdentity = msg.includes('tamep') || msg.includes('eptam') || msg.includes('tam ep');
+  const hasShortener = /(bit\.ly|tinyurl\.com|t\.co|goo\.gl|is\.gd|cutt\.ly)/i.test(broadcastForm.value.message || '');
+  return {
+    hasIdentity,
+    hasShortener,
+    safe: hasIdentity && !hasShortener,
+  };
+});
 
 const broadcastDetailModal = ref({
   isOpen: false,
   loading: false,
   campaign: null,
   recipients: [],
+  pagination: {
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+    from: 0,
+    to: 0,
+  },
 });
 
 const importedManifest = ref(null);
@@ -3971,7 +4674,11 @@ function applyImportedManifest(manifest) {
   }
 
   // Guardar lista de pasajeros en el formulario
-  broadcastForm.value.manifest_passengers = manifest.passengers || [];
+  broadcastForm.value.manifest_passengers = (manifest.passengers || []).map((p, idx) => ({
+    ...p,
+    num: p.num || idx + 1,
+  }));
+  importedManifest.value.passengers = broadcastForm.value.manifest_passengers;
 
   flightDetectedInfo.value = {
     source: 'manifest_pdf',
@@ -3987,8 +4694,168 @@ function applyImportedManifest(manifest) {
     total_passengers: manifest.total_passengers,
   };
 
-  // Calcular previsualización inmediata con los datos del manifiesto
   fetchBroadcastPreview();
+}
+
+const showEditFlightModal = ref(false);
+const editingManifestIndex = ref(null);
+const manifestSearchQuery = ref('');
+
+const filteredManifestPassengers = computed(() => {
+  const list = broadcastForm.value.manifest_passengers || [];
+  const q = (manifestSearchQuery.value || '').trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(p => 
+    (p.passenger_name || '').toLowerCase().includes(q) ||
+    (p.phone || '').includes(q) ||
+    (p.pnr || '').toLowerCase().includes(q)
+  );
+});
+
+function startEditManifestPassenger(idx) {
+  editingManifestIndex.value = idx;
+}
+
+function saveManifestPassenger(idx) {
+  const pax = filteredManifestPassengers.value[idx];
+  if (pax) {
+    pax.phone = (pax.phone || '').replace(/\D/g, '');
+    pax.passenger_name = (pax.passenger_name || '').trim().toUpperCase();
+    pax.paternal_surname = extractPaternalSurname(pax.passenger_name);
+  }
+  syncManifestCounts();
+  editingManifestIndex.value = null;
+  showToast('Pasajero del manifiesto actualizado.', 'success');
+  if (broadcastPreviewData.value) {
+    fetchBroadcastPreview();
+  }
+}
+
+function cancelEditManifestPassenger() {
+  editingManifestIndex.value = null;
+}
+
+function deleteManifestPassenger(idx) {
+  const targetPax = filteredManifestPassengers.value[idx];
+  if (!targetPax) return;
+  if (confirm(`¿Eliminar al pasajero ${targetPax.passenger_name || 'seleccionado'} del manifiesto?`)) {
+    const realIdx = broadcastForm.value.manifest_passengers.indexOf(targetPax);
+    if (realIdx !== -1) {
+      broadcastForm.value.manifest_passengers.splice(realIdx, 1);
+    }
+    syncManifestCounts();
+    showToast('Pasajero eliminado del manifiesto.', 'info');
+    if (broadcastPreviewData.value) {
+      fetchBroadcastPreview();
+    }
+  }
+}
+
+function addManifestPassenger() {
+  const newPax = {
+    num: (broadcastForm.value.manifest_passengers?.length || 0) + 1,
+    pnr: 'MANUAL',
+    passenger_name: '',
+    paternal_surname: '',
+    phone: '',
+    origin: broadcastForm.value.origin || 'VVI',
+    destination: broadcastForm.value.destination || 'LPB',
+    flight_number: broadcastForm.value.flight_number || '',
+  };
+  broadcastForm.value.manifest_passengers.unshift(newPax);
+  manifestSearchQuery.value = '';
+  editingManifestIndex.value = 0;
+  syncManifestCounts();
+}
+
+function syncManifestCounts() {
+  const list = broadcastForm.value.manifest_passengers || [];
+  const valid = list.filter(p => (p.phone || '').replace(/\D/g, '').length >= 8).length;
+  if (importedManifest.value) {
+    importedManifest.value.total_passengers = list.length;
+    importedManifest.value.valid_phones_count = valid;
+    importedManifest.value.passengers = list;
+  }
+  if (flightDetectedInfo.value) {
+    flightDetectedInfo.value.total_passengers = list.length;
+    flightDetectedInfo.value.valid_phones_count = valid;
+  }
+}
+
+function updateFlightDetectedInfo() {
+  if (flightDetectedInfo.value) {
+    flightDetectedInfo.value.flight_number = broadcastForm.value.flight_number;
+    flightDetectedInfo.value.origin = broadcastForm.value.origin;
+    flightDetectedInfo.value.destination = broadcastForm.value.destination;
+    flightDetectedInfo.value.origin_city = resolveCity(broadcastForm.value.origin);
+    flightDetectedInfo.value.destination_city = resolveCity(broadcastForm.value.destination);
+    flightDetectedInfo.value.departure_time = broadcastForm.value.flight_time;
+    flightDetectedInfo.value.departure_date = broadcastForm.value.flight_date;
+  }
+  if (importedManifest.value) {
+    importedManifest.value.flight_number = broadcastForm.value.flight_number;
+    importedManifest.value.origin = broadcastForm.value.origin;
+    importedManifest.value.destination = broadcastForm.value.destination;
+    importedManifest.value.departure_time = broadcastForm.value.flight_time;
+    importedManifest.value.departure_date = broadcastForm.value.flight_date;
+  }
+  if (broadcastPreviewData.value) {
+    fetchBroadcastPreview();
+  }
+}
+
+const previewSearchQuery = ref('');
+
+const filteredPreviewRecipients = computed(() => {
+  const list = broadcastPreviewData.value?.recipients || broadcastPreviewData.value?.sample_recipients || [];
+  const q = (previewSearchQuery.value || '').trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(p => 
+    (p.passenger_name || '').toLowerCase().includes(q) ||
+    (p.phone || '').includes(q) ||
+    (p.flight_number || '').toLowerCase().includes(q) ||
+    (p.booking_reference || '').toLowerCase().includes(q)
+  );
+});
+
+function excludeRecipientFromPreview(pax) {
+  const cleanPhone = (pax.phone || '').replace(/\D/g, '');
+  let removed = false;
+
+  // 1. Si está en manifest_passengers
+  if (broadcastForm.value.manifest_passengers?.length) {
+    const idx = broadcastForm.value.manifest_passengers.findIndex(p => (p.phone || '').replace(/\D/g, '') === cleanPhone);
+    if (idx !== -1) {
+      broadcastForm.value.manifest_passengers.splice(idx, 1);
+      syncManifestCounts();
+      removed = true;
+    }
+  }
+
+  // 2. Si está en manual_phones
+  if (broadcastForm.value.manual_phones) {
+    const lines = broadcastForm.value.manual_phones.split(/[\r\n;]+/).map(l => l.trim()).filter(Boolean);
+    const newLines = lines.filter(l => !l.includes(cleanPhone));
+    if (newLines.length !== lines.length) {
+      broadcastForm.value.manual_phones = newLines.join('\n');
+      removed = true;
+    }
+  }
+
+  if (removed) {
+    showToast(`Pasajero ${pax.passenger_name} (${cleanPhone}) excluido del envío.`, 'info');
+    fetchBroadcastPreview();
+  } else {
+    // Si viene de CRM
+    if (broadcastPreviewData.value?.recipients) {
+      broadcastPreviewData.value.recipients = broadcastPreviewData.value.recipients.filter(p => (p.phone || '').replace(/\D/g, '') !== cleanPhone);
+      broadcastPreviewData.value.total_recipients = broadcastPreviewData.value.recipients.length;
+      if (broadcastPreviewData.value.sample_recipients) {
+        broadcastPreviewData.value.sample_recipients = broadcastPreviewData.value.recipients;
+      }
+      showToast(`Pasajero ${pax.passenger_name} omitido de la lista.`, 'info');
+    }
+  }
 }
 
 function clearFlightDetected() {
@@ -4059,20 +4926,26 @@ async function fetchBroadcastPreview() {
 
 async function submitBroadcastCampaign() {
   const count = broadcastPreviewData.value?.total_recipients || 0;
-  if (!confirm(`¿Iniciar el envío masivo por SMS (GoIP - Entel) a ${count} pasajero(s)?`)) {
+  const channelLabel = `SMS GoIP (${broadcastForm.value.goip_line === 'both' ? 'Puertos 1 y 2 Intercalados' : 'Puerto ' + broadcastForm.value.goip_line})`;
+  if (!confirm(`¿Iniciar el envío masivo mediante ${channelLabel} a ${count} pasajero(s)?`)) {
     return;
   }
   broadcastSubmitting.value = true;
   try {
     const payload = {
       ...broadcastForm.value,
-      channel: 'sms', // Exclusivo SMS GoIP
+      channel: broadcastForm.value.channel || 'sms',
+      goip_line: broadcastForm.value.goip_line || 'both',
+      dispatch_immediate: broadcastForm.value.dispatch_immediate,
     };
     const res = await api.post('/admin/broadcasts', payload);
     if (res.data?.success) {
-      showToast(`¡Campaña iniciada con éxito! Los SMS se procesarán en segundo plano (15s por chip Entel).`);
+      showToast(`¡Campaña iniciada con éxito! El sistema enviará los SMS automáticamente.`);
       broadcastPreviewData.value = null;
       await fetchBroadcastCampaigns();
+
+      // INICIAR DESPACHO Y ACTUALIZACIÓN AUTOMÁTICA EN SEGUNDO PLANO
+      startAutoBroadcastEngine();
     }
   } catch (e) {
     console.error('Error al iniciar la campaña:', e);
@@ -4082,10 +4955,10 @@ async function submitBroadcastCampaign() {
   }
 }
 
-async function fetchBroadcastCampaigns() {
+async function fetchBroadcastCampaigns(page = 1) {
   broadcastLoading.value = true;
   try {
-    const params = {};
+    const params = { page };
     if (broadcastFilters.value.flight_number) {
       params.flight_number = broadcastFilters.value.flight_number;
     }
@@ -4094,7 +4967,16 @@ async function fetchBroadcastCampaigns() {
     }
     const res = await api.get('/admin/broadcasts', { params });
     if (res.data?.success) {
-      broadcastCampaigns.value = res.data.campaigns.data || [];
+      const paginator = res.data.campaigns;
+      broadcastCampaigns.value = paginator.data || [];
+      broadcastPagination.value = {
+        current_page: paginator.current_page || 1,
+        last_page: paginator.last_page || 1,
+        total: paginator.total || 0,
+        from: paginator.from || 0,
+        to: paginator.to || 0,
+        per_page: paginator.per_page || 15,
+      };
     }
   } catch (e) {
     console.error('Error cargando campañas:', e);
@@ -4103,27 +4985,46 @@ async function fetchBroadcastCampaigns() {
   }
 }
 
+function changeBroadcastPage(page) {
+  if (page >= 1 && page <= broadcastPagination.value.last_page && page !== broadcastPagination.value.current_page) {
+    fetchBroadcastCampaigns(page);
+  }
+}
+
 function clearBroadcastFilters() {
   broadcastFilters.value.flight_number = '';
   broadcastFilters.value.date = '';
-  fetchBroadcastCampaigns();
+  fetchBroadcastCampaigns(1);
 }
 
-async function openCampaignDetails(campaign) {
+async function openCampaignDetails(campaign, page = 1) {
   broadcastDetailModal.value.isOpen = true;
   broadcastDetailModal.value.loading = true;
   broadcastDetailModal.value.campaign = campaign;
   try {
-    const res = await api.get(`/admin/broadcasts/${campaign.id}`);
+    const res = await api.get(`/admin/broadcasts/${campaign.id}`, { params: { page } });
     if (res.data?.success) {
       broadcastDetailModal.value.campaign = res.data.campaign;
-      broadcastDetailModal.value.recipients = res.data.recipients.data || [];
+      const paginator = res.data.recipients;
+      broadcastDetailModal.value.recipients = paginator.data || [];
+      broadcastDetailModal.value.pagination = {
+        current_page: paginator.current_page || 1,
+        last_page: paginator.last_page || 1,
+        total: paginator.total || 0,
+        from: paginator.from || 0,
+        to: paginator.to || 0,
+      };
     }
   } catch (e) {
     console.error('Error cargando detalle:', e);
   } finally {
     broadcastDetailModal.value.loading = false;
   }
+}
+
+function changeCampaignDetailsPage(page) {
+  if (!broadcastDetailModal.value.campaign) return;
+  openCampaignDetails(broadcastDetailModal.value.campaign, page);
 }
 
 async function retryFailedCampaign(campaign) {
@@ -4135,6 +5036,7 @@ async function retryFailedCampaign(campaign) {
     if (res.data?.success) {
       showToast(res.data.message);
       await fetchBroadcastCampaigns();
+      startAutoBroadcastEngine();
       if (broadcastDetailModal.value.isOpen) {
         await openCampaignDetails(campaign);
       }
@@ -4259,6 +5161,138 @@ async function triggerProcessQueue() {
     showToast(e.response?.data?.message || 'Error al procesar la cola SMS.', 'error');
   } finally {
     processingQueue.value = false;
+  }
+}
+
+// ========================================================
+// MOTOR AUTOMÁTICO DE DESPACHO Y ACTUALIZACIÓN EN VIVO
+// ========================================================
+function startAutoBroadcastEngine() {
+  if (isAutoBroadcasting.value && autoBroadcastTimer) return;
+  isAutoBroadcasting.value = true;
+  runAutoBroadcastCycle();
+  autoBroadcastTimer = setInterval(runAutoBroadcastCycle, 4000);
+}
+
+function stopAutoBroadcastEngine() {
+  isAutoBroadcasting.value = false;
+  if (autoBroadcastTimer) {
+    clearInterval(autoBroadcastTimer);
+    autoBroadcastTimer = null;
+  }
+}
+
+async function runAutoBroadcastCycle() {
+  if (processingQueue.value) return;
+  try {
+    processingQueue.value = true;
+    const res = await api.post('/admin/broadcasts/process-queue');
+    const remaining = res.data?.remaining_count ?? 0;
+
+    // Actualización silenciosa de campañas en vivo
+    await fetchBroadcastCampaignsSilent();
+
+    // Si el modal de detalle está abierto, refrescar también en vivo
+    if (broadcastDetailModal.value.isOpen && broadcastDetailModal.value.campaign?.id) {
+      const detailRes = await api.get(`/admin/broadcasts/${broadcastDetailModal.value.campaign.id}`);
+      if (detailRes.data?.success) {
+        broadcastDetailModal.value.campaign = detailRes.data.campaign;
+        broadcastDetailModal.value.recipients = detailRes.data.recipients.data || [];
+      }
+    }
+
+    // Verificar si quedan campañas activas pendientes
+    const hasActive = broadcastCampaigns.value.some(c => ['processing', 'pending'].includes(c.status));
+    if (remaining === 0 && !hasActive) {
+      stopAutoBroadcastEngine();
+    }
+  } catch (e) {
+    console.warn('AutoBroadcastEngine ciclo falló:', e);
+  } finally {
+    processingQueue.value = false;
+  }
+}
+
+async function fetchBroadcastCampaignsSilent() {
+  try {
+    const params = {};
+    if (broadcastFilters.value.flight_number) params.flight_number = broadcastFilters.value.flight_number;
+    if (broadcastFilters.value.date) params.date = broadcastFilters.value.date;
+    const res = await api.get('/admin/broadcasts', { params });
+    if (res.data?.success) {
+      broadcastCampaigns.value = res.data.campaigns.data || [];
+    }
+  } catch (e) {
+    // Ignorar en ciclo silencioso
+  }
+}
+
+async function cancelBroadcastCampaign(campaign) {
+  if (!campaign || !campaign.id) return;
+  if (!confirm(`¿Seguro que deseas cancelar el envío de la campaña "${campaign.title}"? Los mensajes que aún no han salido serán cancelados y no se consumirá saldo.`)) {
+    return;
+  }
+  try {
+    const res = await api.post(`/admin/broadcasts/${campaign.id}/cancel`);
+    if (res.data?.success) {
+      showToast(res.data.message || 'Campaña cancelada con éxito.', 'info');
+      await fetchBroadcastCampaigns();
+      if (broadcastDetailModal.value.isOpen && broadcastDetailModal.value.campaign?.id === campaign.id) {
+        broadcastDetailModal.value.campaign = res.data.campaign;
+        const detailRes = await api.get(`/admin/broadcasts/${campaign.id}`);
+        if (detailRes.data?.success) {
+          broadcastDetailModal.value.recipients = detailRes.data.recipients.data || [];
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error al cancelar campaña:', e);
+    showToast(e.response?.data?.message || 'Error al cancelar la campaña.', 'error');
+  }
+}
+
+async function fetchGatewayStatus() {
+  gatewayStatus.value.loading = true;
+  try {
+    const res = await api.get('/admin/broadcasts/gateway-status');
+    if (res.data?.success) {
+      gatewayStatus.value.data = res.data.gateway;
+      gatewayStatus.value.online = res.data.gateway?.online ?? true;
+    }
+  } catch (e) {
+    console.warn('No se pudo verificar el estado del gateway GoIP:', e);
+  } finally {
+    gatewayStatus.value.loading = false;
+  }
+}
+
+function toggleAutoQueueWorker() {
+  autoQueueWorker.value.active = !autoQueueWorker.value.active;
+  if (autoQueueWorker.value.active) {
+    showToast('Auto-procesador de cola SMS activado (Web Worker en segundo plano).', 'info');
+    runAutoQueueWorkerCycle();
+    autoQueueWorker.value.intervalId = setInterval(runAutoQueueWorkerCycle, 6000);
+  } else {
+    if (autoQueueWorker.value.intervalId) {
+      clearInterval(autoQueueWorker.value.intervalId);
+      autoQueueWorker.value.intervalId = null;
+    }
+    showToast('Auto-procesador de cola SMS detenido.', 'info');
+  }
+}
+
+async function runAutoQueueWorkerCycle() {
+  if (processingQueue.value) return;
+  try {
+    const res = await api.post('/admin/broadcasts/process-queue');
+    if (res.data?.success) {
+      autoQueueWorker.value.pendingCount = res.data.remaining_count ?? 0;
+      if (res.data.remaining_count === 0 && autoQueueWorker.value.active) {
+        await fetchBroadcastCampaigns();
+      }
+    }
+  } catch (e) {
+    console.warn('AutoQueueWorker ciclo falló:', e);
   }
 }
 

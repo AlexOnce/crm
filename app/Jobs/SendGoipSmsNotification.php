@@ -4,12 +4,12 @@ namespace App\Jobs;
 
 use App\Models\BroadcastCampaign;
 use App\Models\BroadcastRecipient;
+use App\Services\GoipSmsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class SendGoipSmsNotification implements ShouldQueue
@@ -53,80 +53,28 @@ class SendGoipSmsNotification implements ShouldQueue
     /**
      * Ejecuta el envío del SMS a través del Gateway GoIP.
      */
-    public function handle(): void
+    public function handle(GoipSmsService $goipService): void
     {
-        // 1. Obtener parámetros de configuración del GoIP
-        $host = (string) config('services.goip.host', env('GOIP_HOST', '192.168.1.100'));
-        $port = (string) config('services.goip.port', env('GOIP_PORT', '80'));
-        $username = (string) config('services.goip.user', env('GOIP_USER', 'admin'));
-        $password = (string) config('services.goip.password', env('GOIP_PASSWORD', 'admin'));
-        $slotLine = $this->line ?? (int) config('services.goip.line', env('GOIP_LINE', 1));
-        $httpTimeout = (int) config('services.goip.timeout', env('GOIP_TIMEOUT_SECONDS', 20));
-        $delaySeconds = (int) config('services.goip.delay', env('GOIP_DELAY_SECONDS', 15));
+        $slotLine = $this->line ?? $goipService->getNextAlternatingLine();
 
-        // 2. Sanitizar datos: GSM-7 para el cuerpo y normalización numérica del teléfono
-        $cleanMessage = $this->sanitizeGsm7($this->message);
-        $cleanPhone = $this->sanitizePhoneNumber($this->phone);
-
-        if (empty($cleanPhone)) {
-            Log::warning('SendGoipSmsNotification: Número de teléfono inválido o vacío para SMS.', [
-                'original_phone' => $this->phone,
-                'lead_id' => $this->leadId,
-            ]);
+        $recipient = $this->broadcastRecipientId ? BroadcastRecipient::find($this->broadcastRecipientId) : null;
+        if ($recipient && ($recipient->status === 'cancelled' || $recipient->campaign?->status === 'cancelled')) {
+            Log::info("SendGoipSmsNotification: Despacho cancelado para {$this->phone} (Destinatario o Campaña cancelada).");
 
             return;
         }
 
-        if (empty($cleanMessage)) {
-            Log::warning('SendGoipSmsNotification: Contenido del mensaje vacío tras la sanitización.', [
-                'phone' => $cleanPhone,
-                'lead_id' => $this->leadId,
-            ]);
-
-            return;
-        }
-
-        // 3. Estructurar la URL del API HTTP nativo de GoIP
-        $endpoint = "http://{$host}:{$port}/default/en_US/send.html";
+        $isInterleaved = ($recipient?->campaign?->filters['goip_line'] ?? 'both') === 'both';
 
         try {
-            Log::info("SendGoipSmsNotification: Despachando SMS a {$cleanPhone} vía GoIP (Línea {$slotLine})", [
-                'phone' => $cleanPhone,
-                'chars_count' => mb_strlen($cleanMessage),
-                'lead_id' => $this->leadId,
-            ]);
+            // Envío con retardo dinámico aleatorio (Jitter) para cumplimiento con Entel
+            $result = $goipService->sendSms($this->phone, $this->message, $slotLine, true, $isInterleaved);
 
-            // Petición HTTP GET nativa de Laravel
-            $response = Http::timeout($httpTimeout)
-                ->get($endpoint, [
-                    'u' => $username,
-                    'p' => $password,
-                    'l' => $slotLine,
-                    'n' => $cleanPhone,
-                    'm' => $cleanMessage,
-                ]);
-
-            $statusCode = $response->status();
-            $responseBody = trim($response->body());
-
-            // 4. Validar respuesta HTTP y respuestas textuales de error nativas del GoIP
-            if (! $response->successful() || $this->hasGoipError($responseBody)) {
-                Log::error('SendGoipSmsNotification: GoIP devolvió un error o respuesta inesperada.', [
-                    'phone' => $cleanPhone,
-                    'http_status' => $statusCode,
-                    'response_body' => $responseBody,
-                    'lead_id' => $this->leadId,
-                ]);
-
-                // Forzar reintento si aún quedan intentos disponibles
-                throw new \RuntimeException("Fallo GoIP (HTTP {$statusCode}): {$responseBody}");
+            if (! $result['success']) {
+                throw new \RuntimeException($result['error'] ?? 'Fallo desconocido en Gateway GoIP');
             }
 
-            // Extraer ID de despacho generado por el GoIP (ej: "Sending,L1 Send SMS to:74844348; ID:6ace9b89")
-            $dispatchId = null;
-            if (preg_match('/ID:([a-zA-Z0-9]+)/', $responseBody, $matches)) {
-                $dispatchId = $matches[1];
-            }
+            $dispatchId = $result['message_id'];
 
             // Actualizar registro de destinatario en campaña masiva si aplica
             if ($this->broadcastRecipientId) {
@@ -134,8 +82,8 @@ class SendGoipSmsNotification implements ShouldQueue
                 if ($recipient) {
                     $recipient->update([
                         'status' => 'sent',
-                        'channel_used' => 'sms',
-                        'gateway_message_id' => $dispatchId,
+                        'channel_used' => "sms_l{$slotLine}",
+                        'gateway_message_id' => "L{$slotLine}:{$dispatchId}",
                         'sent_at' => now(),
                     ]);
                     $recipient->campaign?->increment('sent_count');
@@ -143,15 +91,14 @@ class SendGoipSmsNotification implements ShouldQueue
                 }
             }
 
-            Log::info("SendGoipSmsNotification: SMS enviado con éxito a {$cleanPhone}", [
+            Log::info("SendGoipSmsNotification: SMS enviado con éxito a {$this->phone}", [
                 'goip_id' => $dispatchId,
-                'response_summary' => substr(strip_tags($responseBody), 0, 100),
                 'lead_id' => $this->leadId,
                 'broadcast_recipient_id' => $this->broadcastRecipientId,
             ]);
         } catch (\Throwable $e) {
             Log::error('SendGoipSmsNotification: Excepción al comunicarse con el hardware GoIP: '.$e->getMessage(), [
-                'phone' => $cleanPhone,
+                'phone' => $this->phone,
                 'lead_id' => $this->leadId,
                 'attempt' => $this->attempts(),
             ]);
@@ -162,7 +109,7 @@ class SendGoipSmsNotification implements ShouldQueue
                 if ($recipient) {
                     $recipient->update([
                         'status' => 'failed',
-                        'channel_used' => 'sms',
+                        'channel_used' => "sms_l{$slotLine}",
                         'error_message' => $e->getMessage(),
                     ]);
                     $recipient->campaign?->increment('failed_count');
@@ -172,12 +119,6 @@ class SendGoipSmsNotification implements ShouldQueue
 
             // Permitir que el sistema de colas maneje los reintentos o marque como fallido
             throw $e;
-        } finally {
-            // 5. Control Anti-Spam / Throttling: Pausa obligatoria entre envíos para la operadora Entel
-            // Garantiza que el canal GSM quede liberado y previene bloqueo del chip por ráfagas
-            if ($delaySeconds > 0) {
-                sleep($delaySeconds);
-            }
         }
     }
 

@@ -9,6 +9,7 @@ use App\Models\BroadcastRecipient;
 use App\Models\Lead;
 use App\Services\FlightManifestParserService;
 use App\Services\FlightMicroservice;
+use App\Services\GoipSmsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class MassBroadcastController extends Controller
     /**
      * Previsualiza los destinatarios y métricas de una difusión antes de disparar.
      */
-    public function preview(Request $request): JsonResponse
+    public function preview(Request $request, GoipSmsService $goipService): JsonResponse
     {
         $validated = $request->validate([
             'flight_number' => 'nullable|string|max:20',
@@ -29,9 +30,12 @@ class MassBroadcastController extends Controller
             'origin' => 'nullable|string|max:10',
             'destination' => 'nullable|string|max:10',
             'status' => 'nullable|string', // 'emitido', 'comprado', 'todos'
-            'manual_phones' => 'nullable|string', // lista separada por comas o saltos de línea
+            'manual_phones' => 'nullable|string', // lista separada por comas o saltos de línea con o sin apellido
+            'manual_passengers' => 'nullable|array',
             'manifest_passengers' => 'nullable|array',
             'message' => 'nullable|string|max:1000',
+            'channel' => 'nullable|in:sms,whatsapp,hybrid',
+            'goip_line' => 'nullable|string|in:all,both,1,2',
         ]);
 
         $query = Lead::query();
@@ -64,29 +68,18 @@ class MassBroadcastController extends Controller
             ->where('phone', '!=', '')
             ->get();
 
-        // 2. Procesar números manuales si existen
-        $manualList = [];
-        if (! empty($validated['manual_phones'])) {
-            $rawPhones = preg_split('/[\r\n,;]+/', $validated['manual_phones']);
-            foreach ($rawPhones as $raw) {
-                $clean = preg_replace('/\D/', '', (string) $raw);
-                if (strlen($clean) >= 8) {
-                    $manualList[] = [
-                        'id' => null,
-                        'passenger_name' => 'Pasajero',
-                        'paternal_surname' => 'Pasajero',
-                        'phone' => $clean,
-                        'flight_number' => $validated['flight_number'] ?? 'N/A',
-                        'flight_date' => $validated['flight_date'] ?? null,
-                        'flight_time' => $validated['flight_time'] ?? null,
-                        'origin' => $validated['origin'] ?? '',
-                        'destination' => $validated['destination'] ?? '',
-                        'booking_reference' => null,
-                        'status' => 'manual',
-                    ];
-                }
-            }
-        }
+        // 2. Procesar números y apellidos manuales si existen
+        $manualList = $this->extractManualPassengers(
+            $validated['manual_phones'] ?? null,
+            $validated['manual_passengers'] ?? [],
+            [
+                'flight_number' => $validated['flight_number'] ?? 'N/A',
+                'flight_date' => $validated['flight_date'] ?? null,
+                'flight_time' => $validated['flight_time'] ?? null,
+                'origin' => $validated['origin'] ?? '',
+                'destination' => $validated['destination'] ?? '',
+            ]
+        );
 
         // 3. Unificar y desduplicar por número de teléfono
         $seenPhones = [];
@@ -144,6 +137,25 @@ class MassBroadcastController extends Controller
             }
         }
 
+        $selectedGoipLine = $validated['goip_line'] ?? 'both';
+        if ($selectedGoipLine === '1' || $selectedGoipLine === 1) {
+            $assignedLines = [1];
+        } elseif ($selectedGoipLine === '2' || $selectedGoipLine === 2) {
+            $assignedLines = [2];
+        } else {
+            $assignedLines = $goipService->getActiveLines();
+            if (empty($assignedLines)) {
+                $assignedLines = [1, 2];
+            }
+        }
+
+        $totalAssigned = count($assignedLines);
+        foreach ($uniquePassengers as $idx => &$pax) {
+            $pax['assigned_line'] = (int) $assignedLines[$idx % $totalAssigned];
+            $pax['assigned_port_label'] = 'Puerto '.$pax['assigned_line'];
+        }
+        unset($pax);
+
         $totalRecipients = count($uniquePassengers);
 
         // 4. Calcular costo estimado de SMS según longitud de la plantilla
@@ -155,16 +167,45 @@ class MassBroadcastController extends Controller
         $charsCount = mb_strlen($samplePersonalized);
         $smsSegments = $this->calculateSmsSegments($charsCount);
 
+        // Validar cumplimiento de normativas de Entel / ATT
+        $compliance = $goipService->validateEntelCompliance($samplePersonalized);
+        $lineStats = $goipService->getUsageStats(1);
+
+        $linesStats = [];
+        foreach ($assignedLines as $l) {
+            $lStats = $goipService->getUsageStats((int) $l);
+            $linesStats[] = [
+                'line' => (int) $l,
+                'port_label' => 'Puerto '.(int) $l,
+                'hourly_sent' => $lStats['hourly'],
+                'daily_sent' => $lStats['daily'],
+                'max_hourly' => GoipSmsService::MAX_RECOMMENDED_HOURLY_SMS,
+                'max_daily' => GoipSmsService::MAX_RECOMMENDED_DAILY_SMS,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'total_recipients' => $totalRecipients,
-            'sample_recipients' => array_slice($uniquePassengers, 0, 10),
+            'recipients' => $uniquePassengers,
+            'sample_recipients' => $uniquePassengers,
+            'active_lines' => $assignedLines,
+            'interleaving_enabled' => count($assignedLines) > 1,
+            'lines_stats' => $linesStats,
             'sms_metrics' => [
                 'chars_count' => $charsCount,
                 'sms_per_recipient' => $smsSegments,
                 'total_sms_estimated' => $totalRecipients * $smsSegments,
             ],
             'sample_message' => $samplePersonalized,
+            'compliance' => $compliance,
+            'anti_ban_stats' => [
+                'hourly_sent' => $lineStats['hourly'],
+                'daily_sent' => $lineStats['daily'],
+                'max_recommended_hourly' => GoipSmsService::MAX_RECOMMENDED_HOURLY_SMS,
+                'max_recommended_daily' => GoipSmsService::MAX_RECOMMENDED_DAILY_SMS,
+                'safe_quota' => ($lineStats['hourly'] < GoipSmsService::MAX_RECOMMENDED_HOURLY_SMS && $lineStats['daily'] < GoipSmsService::MAX_RECOMMENDED_DAILY_SMS),
+            ],
         ]);
     }
 
@@ -175,7 +216,8 @@ class MassBroadcastController extends Controller
     {
         $validated = $request->validate([
             'title' => 'nullable|string|max:150',
-            'channel' => 'nullable|in:sms',
+            'channel' => 'nullable|in:sms,whatsapp,hybrid',
+            'goip_line' => 'nullable|string|in:all,both,1,2',
             'template_type' => 'nullable|string|max:50',
             'message' => 'required|string|max:1000',
             'flight_number' => 'nullable|string|max:20',
@@ -185,10 +227,12 @@ class MassBroadcastController extends Controller
             'destination' => 'nullable|string|max:10',
             'status' => 'nullable|string',
             'manual_phones' => 'nullable|string',
+            'manual_passengers' => 'nullable|array',
             'manifest_passengers' => 'nullable|array',
         ]);
 
-        $validated['channel'] = 'sms';
+        $validated['channel'] = ! empty($validated['channel']) ? $validated['channel'] : 'sms';
+        $validated['goip_line'] = ! empty($validated['goip_line']) ? $validated['goip_line'] : 'both';
         $validated['template_type'] = $validated['template_type'] ?? 'custom';
         $validated['title'] = ! empty($validated['title'])
             ? $validated['title']
@@ -294,38 +338,35 @@ class MassBroadcastController extends Controller
                 }
             }
 
-            // 3. Destinatarios añadidos por números manuales adicionales
-            if (! empty($validated['manual_phones'])) {
-                $rawPhones = preg_split('/[\r\n,;]+/', $validated['manual_phones']);
-                foreach ($rawPhones as $raw) {
-                    $cleanPhone = preg_replace('/\D/', '', (string) $raw);
-                    if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
-                        $seenPhones[$cleanPhone] = true;
-                        $manualInfo = [
-                            'passenger_name' => 'Pasajero',
-                            'paternal_surname' => 'Pasajero',
-                            'phone' => $cleanPhone,
-                            'flight_number' => $validated['flight_number'] ?? '',
-                            'flight_date' => $validated['flight_date'] ?? '',
-                            'flight_time' => $validated['flight_time'] ?? null,
-                            'origin' => $validated['origin'] ?? '',
-                            'destination' => $validated['destination'] ?? '',
-                            'booking_reference' => '',
-                        ];
+            // 3. Destinatarios añadidos por números y apellidos manuales adicionales
+            $manualList = $this->extractManualPassengers(
+                $validated['manual_phones'] ?? null,
+                $validated['manual_passengers'] ?? [],
+                [
+                    'flight_number' => $validated['flight_number'] ?? '',
+                    'flight_date' => $validated['flight_date'] ?? '',
+                    'flight_time' => $validated['flight_time'] ?? null,
+                    'origin' => $validated['origin'] ?? '',
+                    'destination' => $validated['destination'] ?? '',
+                ]
+            );
 
-                        $personalized = $this->personalizeMessage($validated['message'], $manualInfo);
+            foreach ($manualList as $manualInfo) {
+                $cleanPhone = $manualInfo['phone'];
+                if (strlen($cleanPhone) >= 8 && ! isset($seenPhones[$cleanPhone])) {
+                    $seenPhones[$cleanPhone] = true;
+                    $personalized = $this->personalizeMessage($validated['message'], $manualInfo);
 
-                        $recipientsData[] = [
-                            'lead_id' => null,
-                            'phone' => $cleanPhone,
-                            'passenger_name' => null,
-                            'flight_number' => $validated['flight_number'] ?? null,
-                            'message' => $personalized,
-                            'status' => 'pending',
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ];
-                    }
+                    $recipientsData[] = [
+                        'lead_id' => null,
+                        'phone' => $cleanPhone,
+                        'passenger_name' => $manualInfo['passenger_name'],
+                        'flight_number' => $validated['flight_number'] ?? ($manualInfo['flight_number'] ?: null),
+                        'message' => $personalized,
+                        'status' => 'pending',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
                 }
             }
 
@@ -353,6 +394,7 @@ class MassBroadcastController extends Controller
                     'origin' => $validated['origin'] ?? null,
                     'destination' => $validated['destination'] ?? null,
                     'status' => $validated['status'] ?? null,
+                    'goip_line' => $validated['goip_line'],
                 ],
                 'total_recipients' => $total,
                 'sent_count' => 0,
@@ -371,6 +413,16 @@ class MassBroadcastController extends Controller
 
             // 4. Despachar el Job Orquestador en segundo plano
             ProcessMassBroadcastJob::dispatch($campaign);
+
+            // Si se solicita despacho inmediato (procesar de una vez sin consola):
+            if ($request->boolean('dispatch_immediate')) {
+                Artisan::call('queue:work', [
+                    '--stop-when-empty' => true,
+                    '--queue' => 'sms,default',
+                    '--tries' => 3,
+                    '--max-time' => 30,
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -467,6 +519,41 @@ class MassBroadcastController extends Controller
     }
 
     /**
+     * Cancela el envío de una campaña de difusión masiva y detiene los mensajes pendientes.
+     */
+    public function cancel(BroadcastCampaign $campaign): JsonResponse
+    {
+        if (in_array($campaign->status, ['completed', 'cancelled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "La campaña ya se encuentra en estado '{$campaign->status}' y no puede ser cancelada.",
+            ], 422);
+        }
+
+        $pendingRecipients = $campaign->recipients()
+            ->whereIn('status', ['pending', 'processing']);
+
+        $cancelledCount = $pendingRecipients->count();
+
+        $pendingRecipients->update([
+            'status' => 'cancelled',
+            'error_message' => 'Envío cancelado por el administrador.',
+        ]);
+
+        $campaign->update([
+            'status' => 'cancelled',
+            'completed_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Campaña cancelada con éxito. Se detuvo el envío a {$cancelledCount} destinatario(s) pendientes.",
+            'campaign' => $campaign->fresh()->load('user:id,name'),
+            'cancelled_count' => $cancelledCount,
+        ]);
+    }
+
+    /**
      * Personaliza las etiquetas dinámicas dentro de una plantilla.
      * En mensajería masiva SMS GoIP se envía solo el apellido paterno y el mensaje predefinido.
      */
@@ -541,6 +628,126 @@ class MassBroadcastController extends Controller
         }
 
         return $parts[0];
+    }
+
+    /**
+     * Extrae y normaliza los destinatarios ingresados manualmente (por texto o estructurados),
+     * separando el número de teléfono y el apellido o nombre de cada pasajero.
+     *
+     * @param  string|null  $rawInput  Texto libre (ej: "74844348 - Perez\n71234567 Mamani")
+     * @param  array  $structuredPassengers  Lista estructurada opcional [{ phone, surname, name }]
+     * @param  array  $flightDefaults  Datos de vuelo por defecto
+     */
+    protected function extractManualPassengers(?string $rawInput, array $structuredPassengers = [], array $flightDefaults = []): array
+    {
+        $result = [];
+        $seen = [];
+
+        // 1. Procesar pasajeros estructurados si se enviaron
+        if (! empty($structuredPassengers)) {
+            foreach ($structuredPassengers as $item) {
+                $phone = preg_replace('/\D/', '', (string) ($item['phone'] ?? ''));
+                if (strlen($phone) >= 8 && ! isset($seen[$phone])) {
+                    $seen[$phone] = true;
+                    $name = trim((string) ($item['passenger_name'] ?? $item['surname'] ?? $item['name'] ?? 'Pasajero'));
+                    $passengerName = ! empty($name) ? mb_strtoupper($name) : 'Pasajero';
+                    $surname = trim((string) ($item['paternal_surname'] ?? $this->extractPaternalSurname($passengerName)));
+
+                    $result[] = [
+                        'id' => null,
+                        'passenger_name' => $passengerName,
+                        'paternal_surname' => $surname ?: 'Pasajero',
+                        'phone' => $phone,
+                        'flight_number' => $flightDefaults['flight_number'] ?? 'N/A',
+                        'flight_date' => $flightDefaults['flight_date'] ?? null,
+                        'flight_time' => $flightDefaults['flight_time'] ?? null,
+                        'origin' => $flightDefaults['origin'] ?? '',
+                        'destination' => $flightDefaults['destination'] ?? '',
+                        'booking_reference' => 'MANUAL',
+                        'status' => 'manual',
+                    ];
+                }
+            }
+        }
+
+        // 2. Procesar texto libre (manual_phones) con soporte inteligente de teléfono y apellido
+        if (! empty($rawInput)) {
+            $lines = preg_split('/[\r\n;]+/', $rawInput);
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) {
+                    continue;
+                }
+
+                // Si una línea contiene múltiples números separados por coma (ej: "74844348, 71234567" o "74844348 - Perez, 71234567 - Gomez")
+                preg_match_all('/\b\d{8,11}\b/', $line, $phoneMatches);
+                if (count($phoneMatches[0]) > 1 && str_contains($line, ',')) {
+                    $tokens = explode(',', $line);
+                    foreach ($tokens as $token) {
+                        $parsed = $this->parseSingleManualEntry($token, $flightDefaults);
+                        if ($parsed && ! isset($seen[$parsed['phone']])) {
+                            $seen[$parsed['phone']] = true;
+                            $result[] = $parsed;
+                        }
+                    }
+
+                    continue;
+                }
+
+                $parsed = $this->parseSingleManualEntry($line, $flightDefaults);
+                if ($parsed && ! isset($seen[$parsed['phone']])) {
+                    $seen[$parsed['phone']] = true;
+                    $result[] = $parsed;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Parsea una línea o token individual para extraer número de teléfono y apellido.
+     */
+    protected function parseSingleManualEntry(string $token, array $flightDefaults = []): ?array
+    {
+        $token = trim($token);
+        if (empty($token)) {
+            return null;
+        }
+
+        // Buscar una secuencia de números telefónicos de Bolivia (8 o más dígitos, con prefijo 591 opcional)
+        if (! preg_match('/(?:\+?591[\s\-]*)?([67]\d{7}|\d{8,12})/u', $token, $matches, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $fullMatchText = $matches[0][0];
+        $digitsOnly = $matches[1][0];
+
+        $cleanPhone = preg_replace('/\D/', '', $digitsOnly);
+        if (strlen($cleanPhone) < 8) {
+            return null;
+        }
+
+        // Extraer el texto restante como nombre/apellido
+        $namePart = substr_replace($token, ' ', $matches[0][1], strlen($fullMatchText));
+        $namePart = trim(preg_replace('/[\s\-,;:\/|]+/u', ' ', $namePart));
+
+        $passengerName = ! empty($namePart) ? mb_strtoupper($namePart) : 'Pasajero';
+        $paternalSurname = ! empty($namePart) ? $this->extractPaternalSurname($passengerName) : 'Pasajero';
+
+        return [
+            'id' => null,
+            'passenger_name' => $passengerName,
+            'paternal_surname' => $paternalSurname,
+            'phone' => $cleanPhone,
+            'flight_number' => $flightDefaults['flight_number'] ?? 'N/A',
+            'flight_date' => $flightDefaults['flight_date'] ?? null,
+            'flight_time' => $flightDefaults['flight_time'] ?? null,
+            'origin' => $flightDefaults['origin'] ?? '',
+            'destination' => $flightDefaults['destination'] ?? '',
+            'booking_reference' => 'MANUAL',
+            'status' => 'manual',
+        ];
     }
 
     /**
@@ -750,6 +957,38 @@ class MassBroadcastController extends Controller
                 'message' => 'Error al consultar Transclick: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Retorna el estado de conectividad en vivo del Gateway GoIP y métricas anti-baneo Entel.
+     */
+    public function getGatewayStatus(GoipSmsService $goipService): JsonResponse
+    {
+        $health = $goipService->checkGatewayHealth();
+
+        return response()->json([
+            'success' => true,
+            'gateway' => $health,
+        ]);
+    }
+
+    /**
+     * Valida un texto frente a las normativas de telecomunicaciones de Entel Bolivia / ATT.
+     */
+    public function validateCompliance(Request $request, GoipSmsService $goipService): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => 'required|string|max:1000',
+        ]);
+
+        $compliance = $goipService->validateEntelCompliance($validated['message']);
+        $segments = $goipService->calculateSegments($validated['message']);
+
+        return response()->json([
+            'success' => true,
+            'compliance' => $compliance,
+            'segments' => $segments,
+        ]);
     }
 
     /**

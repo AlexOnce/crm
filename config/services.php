@@ -69,6 +69,7 @@ return [
         'user' => env('GOIP_USER', 'admin'),
         'password' => env('GOIP_PASSWORD', 'admin'),
         'line' => (int) env('GOIP_LINE', 1),
+        'lines' => array_map('intval', explode(',', (string) env('GOIP_LINES', '1,2'))),
         'delay' => (int) env('GOIP_DELAY_SECONDS', 15),
         'timeout' => (int) env('GOIP_TIMEOUT_SECONDS', 20),
     ],

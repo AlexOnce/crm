@@ -108,10 +108,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/broadcasts/preview', [MassBroadcastController::class, 'preview']);
         Route::post('/broadcasts/import-pdf', [MassBroadcastController::class, 'importPdfManifest']);
         Route::post('/broadcasts/check-flight', [MassBroadcastController::class, 'checkFlightStatus']);
+        Route::get('/broadcasts/gateway-status', [MassBroadcastController::class, 'getGatewayStatus']);
+        Route::post('/broadcasts/validate-compliance', [MassBroadcastController::class, 'validateCompliance']);
         Route::post('/broadcasts/process-queue', [MassBroadcastController::class, 'processQueueNow']);
         Route::get('/broadcasts', [MassBroadcastController::class, 'index']);
         Route::post('/broadcasts', [MassBroadcastController::class, 'store']);
         Route::get('/broadcasts/{campaign}', [MassBroadcastController::class, 'show']);
         Route::post('/broadcasts/{campaign}/retry-failed', [MassBroadcastController::class, 'retryFailed']);
+        Route::post('/broadcasts/{campaign}/cancel', [MassBroadcastController::class, 'cancel']);
     });
 });
