@@ -2709,6 +2709,13 @@
 
         </div>
 
+        <!-- ========================================================
+             PESTAÑA: AVISOS CALL CENTER (ISSABEL PBX)
+             ======================================================== -->
+        <div v-if="activeTab === 'callcenter'" class="space-y-6">
+          <CallCenterBroadcastPanel />
+        </div>
+
       </div>
     </main>
 
@@ -3482,6 +3489,7 @@ import {
 } from 'lucide-vue-next';
 import logoImg from '../../images/logo.jpg';
 import UserProfileModal from '@/components/profile/UserProfileModal.vue';
+import CallCenterBroadcastPanel from '@/components/callcenter/CallCenterBroadcastPanel.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -3517,6 +3525,7 @@ const tabs = computed(() => [
     badge: ticketCounts.value.nuevo > 0 ? ticketCounts.value.nuevo : undefined,
   },
   { id: 'broadcasts', label: 'Avisos SMS', icon: Radio },
+  { id: 'callcenter', label: 'Avisos Call Center', icon: Headphones },
   { id: 'agents', label: 'Agentes', icon: Users },
   { id: 'monitor', label: 'Monitoreo', icon: MessageSquare },
   { id: 'bot_messages', label: 'Mensajes Bot', icon: Bot },
