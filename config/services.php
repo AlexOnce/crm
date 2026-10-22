@@ -74,4 +74,17 @@ return [
         'timeout' => (int) env('GOIP_TIMEOUT_SECONDS', 20),
     ],
 
+    'issabel' => [
+        'host' => env('ISSABEL_HOST', '192.168.1.50'),
+        'port' => (int) env('ISSABEL_AMI_PORT', 5038),
+        'user' => env('ISSABEL_AMI_USER', 'crm_admin'),
+        'secret' => env('ISSABEL_AMI_SECRET', ''),
+        'source_extension' => env('ISSABEL_SOURCE_EXTENSION', '1'),
+        'sip_driver' => env('ISSABEL_SIP_DRIVER', 'sip'),
+        'context' => env('ISSABEL_CONTEXT', 'from-internal'),
+        'timeout' => (int) env('ISSABEL_TIMEOUT_SECONDS', 10),
+        'media_base_url' => env('ISSABEL_MEDIA_BASE_URL', 'https://callcenter.tamep.bo/upload'),
+        'hft_url' => env('ISSABEL_HFT_URL', 'https://callcenter.tamep.bo/hft.php'),
+    ],
+
 ];

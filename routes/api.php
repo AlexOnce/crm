@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AgentManagementController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CallCenterBroadcastController;
 use App\Http\Controllers\Api\CrmChatController;
 use App\Http\Controllers\Api\FlightBookingController;
 use App\Http\Controllers\Api\MassBroadcastController;
@@ -116,5 +117,16 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/broadcasts/{campaign}', [MassBroadcastController::class, 'show']);
         Route::post('/broadcasts/{campaign}/retry-failed', [MassBroadcastController::class, 'retryFailed']);
         Route::post('/broadcasts/{campaign}/cancel', [MassBroadcastController::class, 'cancel']);
+
+        // Avisos Call Center (Integración Issabel PBX / Asterisk)
+        Route::prefix('callcenter')->group(function () {
+            Route::get('/status', [CallCenterBroadcastController::class, 'status']);
+            Route::get('/extensions', [CallCenterBroadcastController::class, 'extensions']);
+            Route::post('/upload-image', [CallCenterBroadcastController::class, 'uploadImage']);
+            Route::post('/send', [CallCenterBroadcastController::class, 'send']);
+            Route::get('/broadcasts', [CallCenterBroadcastController::class, 'index']);
+            Route::get('/broadcasts/{broadcast}', [CallCenterBroadcastController::class, 'show']);
+            Route::post('/broadcasts/{broadcast}/retry-failed', [CallCenterBroadcastController::class, 'retryFailed']);
+        });
     });
 });
