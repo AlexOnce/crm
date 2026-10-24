@@ -23,7 +23,7 @@ php artisan optimize:clear
 Write-Host "`n3. Copiando archivos a carpeta temporal..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Path $tempDir | Out-Null
 
-$includeDirs = @("app", "bootstrap", "config", "database", "public", "resources", "routes", "vendor")
+$includeDirs = @("app", "bootstrap", "config", "database", "documentos", "public", "resources", "routes", "vendor")
 foreach ($dir in $includeDirs) {
     if (Test-Path $dir) {
         Write-Host " - Copiando $dir..." -ForegroundColor Gray

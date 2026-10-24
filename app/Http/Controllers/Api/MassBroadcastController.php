@@ -13,8 +13,10 @@ use App\Services\GoipSmsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MassBroadcastController extends Controller
 {
@@ -297,6 +299,7 @@ class MassBroadcastController extends Controller
                             'phone' => $cleanPhone,
                             'passenger_name' => $paxInfo['passenger_name'],
                             'flight_number' => $paxInfo['flight_number'],
+                            'booking_reference' => $paxInfo['booking_reference'] ?: null,
                             'message' => $personalized,
                             'status' => 'pending',
                             'created_at' => now(),
@@ -330,6 +333,7 @@ class MassBroadcastController extends Controller
                         'phone' => $cleanPhone,
                         'passenger_name' => $lead->passenger_name,
                         'flight_number' => $lead->flight_number,
+                        'booking_reference' => $leadInfo['booking_reference'] ?: null,
                         'message' => $personalized,
                         'status' => 'pending',
                         'created_at' => now(),
@@ -362,6 +366,7 @@ class MassBroadcastController extends Controller
                         'phone' => $cleanPhone,
                         'passenger_name' => $manualInfo['passenger_name'],
                         'flight_number' => $validated['flight_number'] ?? ($manualInfo['flight_number'] ?: null),
+                        'booking_reference' => $manualInfo['booking_reference'] ?? ($manualInfo['pnr'] ?? null),
                         'message' => $personalized,
                         'status' => 'pending',
                         'created_at' => now(),
@@ -472,7 +477,8 @@ class MassBroadcastController extends Controller
     public function show(BroadcastCampaign $campaign): JsonResponse
     {
         $recipients = $campaign->recipients()
-            ->orderByDesc('id')
+            ->with('lead:id,booking_reference')
+            ->orderBy('id')
             ->paginate(50);
 
         return response()->json([
@@ -663,7 +669,7 @@ class MassBroadcastController extends Controller
                         'flight_time' => $flightDefaults['flight_time'] ?? null,
                         'origin' => $flightDefaults['origin'] ?? '',
                         'destination' => $flightDefaults['destination'] ?? '',
-                        'booking_reference' => 'MANUAL',
+                        'booking_reference' => ! empty($item['booking_reference']) ? mb_strtoupper(trim((string) $item['booking_reference'])) : (! empty($item['pnr']) ? mb_strtoupper(trim((string) $item['pnr'])) : null),
                         'status' => 'manual',
                     ];
                 }
@@ -728,8 +734,16 @@ class MassBroadcastController extends Controller
             return null;
         }
 
-        // Extraer el texto restante como nombre/apellido
+        // Extraer el texto restante como nombre/apellido y PNR opcional
         $namePart = substr_replace($token, ' ', $matches[0][1], strlen($fullMatchText));
+
+        // Detectar PNR opcional (ej: [ABC123], (ABC123), o PNR: ABC123)
+        $bookingReference = null;
+        if (preg_match('/(?:pnr[:\s]*|\[|\()([A-Z0-9]{5,8})(?:\]|\))?/iu', $namePart, $pnrMatch)) {
+            $bookingReference = mb_strtoupper($pnrMatch[1]);
+            $namePart = str_replace($pnrMatch[0], ' ', $namePart);
+        }
+
         $namePart = trim(preg_replace('/[\s\-,;:\/|]+/u', ' ', $namePart));
 
         $passengerName = ! empty($namePart) ? mb_strtoupper($namePart) : 'Pasajero';
@@ -745,7 +759,7 @@ class MassBroadcastController extends Controller
             'flight_time' => $flightDefaults['flight_time'] ?? null,
             'origin' => $flightDefaults['origin'] ?? '',
             'destination' => $flightDefaults['destination'] ?? '',
-            'booking_reference' => 'MANUAL',
+            'booking_reference' => $bookingReference,
             'status' => 'manual',
         ];
     }
@@ -804,8 +818,56 @@ class MassBroadcastController extends Controller
      */
     public function importPdfManifest(Request $request, FlightManifestParserService $parser): JsonResponse
     {
+        // Detectar si PHP en cPanel rechazó el archivo por upload_max_filesize o post_max_size
+        if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] !== UPLOAD_ERR_OK) {
+            $errorCode = $_FILES['pdf_file']['error'];
+            $maxUpload = ini_get('upload_max_filesize') ?: '2M';
+            $postMax = ini_get('post_max_size') ?: '8M';
+
+            $errorMessage = match ($errorCode) {
+                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => "El archivo excede el tamaño máximo permitido por PHP en el servidor (upload_max_filesize: {$maxUpload}). Aumenta este valor en cPanel.",
+                UPLOAD_ERR_PARTIAL => 'El archivo se subió solo parcialmente. Intenta nuevamente.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Falta la carpeta temporal de subida en el servidor cPanel.',
+                UPLOAD_ERR_CANT_WRITE => 'No se pudo escribir el archivo en el disco del servidor (revisar cuota de espacio en cPanel).',
+                default => "Error en la subida del archivo (código PHP: {$errorCode}).",
+            };
+
+            return response()->json([
+                'success' => false,
+                'message' => $errorMessage,
+            ], 422);
+        }
+
+        // Validación flexible: admite mimetype application/pdf, extension .pdf y magic bytes %PDF
         $request->validate([
-            'pdf_file' => 'nullable|file|mimes:pdf|max:20480',
+            'pdf_file' => [
+                'nullable',
+                'file',
+                'max:25600',
+                function ($attribute, $value, $fail) {
+                    if (! $value instanceof UploadedFile) {
+                        return;
+                    }
+                    $ext = strtolower($value->getClientOriginalExtension());
+                    if ($ext !== 'pdf') {
+                        $fail('El archivo debe tener extensión .pdf.');
+
+                        return;
+                    }
+                    // Validar cabecera mágica de archivo PDF (%PDF)
+                    $realPath = $value->getRealPath();
+                    if ($realPath && file_exists($realPath)) {
+                        $handle = @fopen($realPath, 'rb');
+                        if ($handle) {
+                            $header = fread($handle, 5);
+                            fclose($handle);
+                            if (! str_starts_with($header, '%PDF')) {
+                                $fail('El archivo no tiene una estructura de PDF válida.');
+                            }
+                        }
+                    }
+                },
+            ],
             'use_default_doc' => 'nullable|boolean',
         ]);
 
@@ -832,7 +894,11 @@ class MassBroadcastController extends Controller
                 'manifest' => $data,
                 'message' => "Manifiesto procesado: {$data['valid_phones_count']} de {$data['total_passengers']} pasajeros con celular boliviano detectados.",
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('Error al procesar manifiesto PDF: '.$e->getMessage(), [
+                'exception' => $e,
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al procesar el archivo PDF: '.$e->getMessage(),

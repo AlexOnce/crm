@@ -16,6 +16,7 @@ class BroadcastRecipient extends Model
         'phone',
         'passenger_name',
         'flight_number',
+        'booking_reference',
         'message',
         'channel_used',
         'status',

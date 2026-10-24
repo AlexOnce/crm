@@ -2099,7 +2099,18 @@
                           class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 uppercase placeholder:normal-case font-sans"
                         />
                       </div>
-                      <div class="relative sm:w-44">
+                      <div class="relative sm:w-28">
+                        <input 
+                          v-model="manualPassengerInput.pnr"
+                          type="text"
+                          maxlength="8"
+                          placeholder="PNR (optativo)"
+                          @keydown.enter.prevent="addManualPassengerRow"
+                          class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono uppercase"
+                          title="Código de reserva PNR (optativo si es manual)"
+                        />
+                      </div>
+                      <div class="relative sm:w-40">
                         <input 
                           v-model="manualPassengerInput.phone"
                           type="text"
@@ -2140,6 +2151,9 @@
                         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-sans"
                       >
                         <strong class="text-sky-700 dark:text-sky-300 font-bold uppercase">{{ pax.surname }}</strong>
+                        <span v-if="pax.pnr" class="px-1.5 py-0.2 rounded font-mono text-[10px] bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-bold border border-sky-200 dark:border-sky-800" title="PNR">
+                          {{ pax.pnr }}
+                        </span>
                         <span class="text-slate-400">·</span>
                         <span class="font-mono text-slate-600 dark:text-slate-300">{{ pax.phone }}</span>
                         <button 
@@ -2246,7 +2260,7 @@
                           <th class="p-2.5 text-center w-10">#</th>
                           <th class="p-2.5">Pasajero</th>
                           <th class="p-2.5">Teléfono</th>
-                          <th class="p-2.5">Puerto GoIP</th>
+                          <th class="p-2.5">Línea SIM de Salida</th>
                           <th class="p-2.5">Vuelo</th>
                           <th class="p-2.5">Ruta</th>
                           <th class="p-2.5">PNR</th>
@@ -2268,19 +2282,20 @@
                           </td>
                           <td class="p-2.5">
                             <span 
-                              class="px-2 py-0.5 rounded text-[10px] font-bold font-sans inline-flex items-center gap-1"
+                              class="px-2 py-0.5 rounded text-[10px] font-bold font-sans inline-flex items-center gap-1.5"
                               :class="pax.assigned_line === 2 || (!pax.assigned_line && idx % 2 === 1) ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'"
                             >
                               <span class="w-1.5 h-1.5 rounded-full" :class="pax.assigned_line === 2 || (!pax.assigned_line && idx % 2 === 1) ? 'bg-purple-500' : 'bg-indigo-500'"></span>
-                              {{ pax.assigned_port_label || ('Puerto ' + (idx % 2 === 0 ? 1 : 2)) }}
+                              {{ (pax.assigned_line === 2 || (!pax.assigned_line && idx % 2 === 1)) ? lineAliases.line2 : lineAliases.line1 }}
                             </span>
                           </td>
                           <td class="p-2.5">{{ pax.flight_number || 'N/A' }}</td>
                           <td class="p-2.5 text-[10px] text-slate-500">
                             {{ pax.origin && pax.destination ? `${pax.origin}→${pax.destination}` : 'N/A' }}
                           </td>
-                          <td class="p-2.5 font-bold text-sky-600 dark:text-sky-400">
-                            {{ pax.booking_reference || 'N/A' }}
+                          <td class="p-2.5">
+                            <span v-if="pax.booking_reference" class="font-bold text-sky-600 dark:text-sky-400">{{ pax.booking_reference }}</span>
+                            <span v-else class="text-slate-400 font-mono text-[11px] italic">- (Manual)</span>
                           </td>
                           <td class="p-2.5 text-center">
                             <button 
@@ -2315,36 +2330,52 @@
                     <span class="text-[10px] text-slate-400 font-normal">(sin esperar cola manual)</span>
                   </label>
 
-                  <!-- Botón de Disparo Principal -->
-                  <button 
-                    type="button" 
-                    @click="submitBroadcastCampaign" 
-                    :disabled="broadcastSubmitting || broadcastPreviewData.total_recipients === 0"
-                    class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                  >
-                    <Loader2 v-if="broadcastSubmitting" class="w-4 h-4 animate-spin" />
-                    <span>Iniciar Envío Masivo a {{ broadcastPreviewData.total_recipients }} Pasajero(s)</span>
-                  </button>
+                  <div class="flex flex-col sm:flex-row items-center gap-2">
+                    <div 
+                      v-if="smsSegmentCount > 1" 
+                      class="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500 text-amber-800 dark:text-amber-200 text-[11px] font-bold flex items-center gap-1.5 animate-pulse"
+                      title="Excede los 160 caracteres y consumirá más SMS por pasajero"
+                    >
+                      <AlertTriangle class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>Excede 160 caracs. (Cobrará {{ smsSegmentCount }} SMS / pasajero)</span>
+                    </div>
+
+                    <!-- Botón de Disparo Principal -->
+                    <button 
+                      type="button" 
+                      @click="submitBroadcastCampaign" 
+                      :disabled="broadcastSubmitting || broadcastPreviewData.total_recipients === 0"
+                      class="w-full sm:w-auto px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                      :class="smsSegmentCount > 1 ? 'bg-amber-600 hover:bg-amber-500 shadow-sm' : 'bg-emerald-600 hover:bg-emerald-500'"
+                    >
+                      <Loader2 v-if="broadcastSubmitting" class="w-4 h-4 animate-spin" />
+                      <span>Iniciar Envío Masivo a {{ broadcastPreviewData.total_recipients }} Pasajero(s)</span>
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Tarjeta de Cumplimiento Normativo Entel y Dual-SIM GoIP -->
                 <div class="p-2.5 rounded-xl bg-sky-50/60 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 flex items-start gap-2.5 text-[11px] text-sky-800 dark:text-sky-300">
                   <ShieldCheck class="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
-                  <div class="space-y-0.5">
+                  <div class="space-y-0.5 flex-1">
                     <div class="font-bold flex items-center gap-1.5 flex-wrap">
-                      <span v-if="broadcastForm.goip_line === 'both'">Intercalado Dual-SIM GoIP Activo (Puertos 1 y 2)</span>
-                      <span v-else>Salida Exclusiva por GoIP Puerto {{ broadcastForm.goip_line }}</span>
+                      <span v-if="broadcastForm.goip_line === 'both'">Intercalado Dual-SIM Activo:</span>
+                      <span v-else>Salida Exclusiva por:</span>
 
-                      <span v-if="broadcastForm.goip_line === 'both' || broadcastForm.goip_line === '1'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">Puerto 1</span>
+                      <span v-if="broadcastForm.goip_line === 'both' || broadcastForm.goip_line === '1'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                        {{ lineAliases.line1 }}
+                      </span>
                       <span v-if="broadcastForm.goip_line === 'both'" class="text-slate-400 text-[10px]">⇄</span>
-                      <span v-if="broadcastForm.goip_line === 'both' || broadcastForm.goip_line === '2'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">Puerto 2</span>
+                      <span v-if="broadcastForm.goip_line === 'both' || broadcastForm.goip_line === '2'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                        {{ lineAliases.line2 }}
+                      </span>
                     </div>
                     <p class="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
                       <span v-if="broadcastForm.goip_line === 'both'">
                         Los envíos se alternan automáticamente 50/50 entre ambas líneas a ~7.5s por despacho (2X más rápido en total), manteniendo intervalos reales de 15 a 20s de reposo en cada chip para máxima protección contra baneos de Entel / ATT.
                       </span>
                       <span v-else>
-                        Los mensajes se transmitirán únicamente por el Puerto {{ broadcastForm.goip_line }} con pausas dinámicas de 12 a 22s y enfriamiento GSM anti-baneo.
+                        Los mensajes se transmitirán únicamente por {{ broadcastForm.goip_line === '1' ? lineAliases.line1 : lineAliases.line2 }} con pausas dinámicas de 12 a 22s y enfriamiento GSM anti-baneo.
                       </span>
                     </p>
                   </div>
@@ -2358,76 +2389,215 @@
               
               <div class="pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  3. Puerto de Salida GoIP y Mensaje
+                  3. Línea Móvil (Chip SIM) y Mensaje
                 </h3>
-                <span class="text-[11px] font-mono" :class="smsCostClass">
-                  {{ smsCharCount }} caracteres ({{ smsSegmentCount }} SMS)
-                </span>
-              </div>
-
-              <!-- Selector de Puerto de Salida GoIP (Líneas SIM) -->
-              <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
-                <div class="flex items-center justify-between mb-0.5">
-                  <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                    Puerto de Salida GoIP (SIM):
-                  </label>
-                  <span class="text-[10px] font-mono text-slate-500">
-                    {{ broadcastForm.goip_line === 'both' ? 'Intercalado (1 y 2)' : ('Solo Puerto ' + broadcastForm.goip_line) }}
+                
+                <!-- Badge Destacado de Contador y Segmentos de SMS -->
+                <div class="flex items-center gap-1.5">
+                  <span 
+                    v-if="smsSegmentCount === 1"
+                    class="px-2.5 py-1 rounded-full text-[11px] font-bold font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 inline-flex items-center gap-1"
+                    title="Longitud óptima: Se cobrará exactamente 1 SMS por pasajero"
+                  >
+                    <CheckCircle2 class="w-3.5 h-3.5" />
+                    <span>{{ smsCharCount }}/160 caracs. (1 SMS)</span>
+                  </span>
+                  <span 
+                    v-else-if="smsSegmentCount === 2"
+                    class="px-2.5 py-1 rounded-full text-[11px] font-extrabold font-mono bg-amber-500/20 text-amber-700 dark:text-amber-300 border-2 border-amber-500 animate-pulse inline-flex items-center gap-1 shadow-xs"
+                    title="¡Advertencia! Excede 160 caracteres y se cobrarán 2 SMS por pasajero"
+                  >
+                    <AlertTriangle class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>{{ smsCharCount }} caracs. (⚠️ 2 SMS/pax)</span>
+                  </span>
+                  <span 
+                    v-else
+                    class="px-2.5 py-1 rounded-full text-[11px] font-black font-mono bg-rose-500/20 text-rose-700 dark:text-rose-300 border-2 border-rose-500 animate-bounce inline-flex items-center gap-1 shadow-sm"
+                    title="¡Atención crítica! Mensaje muy largo, se cobrarán 3 o más SMS por pasajero"
+                  >
+                    <AlertCircle class="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                    <span>{{ smsCharCount }} caracs. (🚨 {{ smsSegmentCount }} SMS/pax)</span>
                   </span>
                 </div>
+              </div>
 
-                <div class="grid grid-cols-3 gap-1.5 text-center">
+              <!-- Selector de Línea de Salida (Chips SIM Bautizados) -->
+              <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                <div class="flex items-center justify-between mb-0.5">
+                  <div class="flex items-center gap-1.5">
+                    <Smartphone class="w-3.5 h-3.5 text-sky-500" />
+                    <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Línea de Salida (Chip SIM):
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    @click="openLineNamingModal"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition cursor-pointer"
+                    title="Personalizar los nombres o números de las líneas SIM"
+                  >
+                    <Edit3 class="w-3 h-3" />
+                    <span>Bautizar / Nombrar Líneas</span>
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-center">
                   <button
                     type="button"
                     @click="broadcastForm.goip_line = 'both'; onPortChange();"
-                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5"
+                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex flex-col items-center justify-center gap-0.5"
                     :class="broadcastForm.goip_line === 'both' 
                       ? 'bg-sky-500/15 border-sky-500 text-sky-700 dark:text-sky-300 font-extrabold shadow-2xs' 
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-sky-300'"
                   >
-                    <span>Ambos (1 y 2)</span>
+                    <span class="truncate max-w-full">Ambas Líneas</span>
+                    <span class="text-[9px] font-normal opacity-75">50/50 Balanceado</span>
                   </button>
 
                   <button
                     type="button"
                     @click="broadcastForm.goip_line = '1'; onPortChange();"
-                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5"
+                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex flex-col items-center justify-center gap-0.5"
                     :class="broadcastForm.goip_line === '1' 
                       ? 'bg-indigo-500/15 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-extrabold shadow-2xs' 
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-indigo-300'"
+                    :title="lineAliases.line1"
                   >
-                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                    <span>Puerto 1</span>
+                    <div class="flex items-center gap-1 max-w-full">
+                      <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+                      <span class="truncate text-[11px]">{{ lineAliases.line1 }}</span>
+                    </div>
+                    <span class="text-[9px] font-normal opacity-75">Solo Chip 1</span>
                   </button>
 
                   <button
                     type="button"
                     @click="broadcastForm.goip_line = '2'; onPortChange();"
-                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5"
+                    class="px-2 py-2 rounded-lg text-xs font-bold border transition cursor-pointer flex flex-col items-center justify-center gap-0.5"
                     :class="broadcastForm.goip_line === '2' 
                       ? 'bg-purple-500/15 border-purple-500 text-purple-700 dark:text-purple-300 font-extrabold shadow-2xs' 
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-purple-300'"
+                    :title="lineAliases.line2"
                   >
-                    <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                    <span>Puerto 2</span>
+                    <div class="flex items-center gap-1 max-w-full">
+                      <span class="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0"></span>
+                      <span class="truncate text-[11px]">{{ lineAliases.line2 }}</span>
+                    </div>
+                    <span class="text-[9px] font-normal opacity-75">Solo Chip 2</span>
                   </button>
                 </div>
 
-
               </div>
 
-              <!-- Textarea del SMS -->
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Texto del mensaje:
-                </label>
-                <textarea 
-                  v-model="broadcastForm.message"
-                  rows="6"
-                  required
-                  placeholder="Escribe el mensaje SMS para los pasajeros..."
-                  class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono leading-relaxed"
-                ></textarea>
+              <!-- Textarea del SMS con Barra de Progreso y Alerta Visual Prominente -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between text-[11px]">
+                  <label class="font-semibold text-slate-600 dark:text-slate-400">
+                    Texto del mensaje:
+                  </label>
+                  <span class="text-[10px] font-mono text-slate-400">
+                    {{ smsCharCount <= 160 ? `${160 - smsCharCount} caracs. restantes para 1 SMS` : `Excedido por ${smsCharCount - 160} caracs.` }}
+                  </span>
+                </div>
+
+                <!-- Barra de Progreso Visual de 160 caracteres -->
+                <div class="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    class="h-full transition-all duration-200"
+                    :class="{
+                      'bg-emerald-500': smsCharCount <= 160,
+                      'bg-amber-500': smsCharCount > 160 && smsCharCount <= 306,
+                      'bg-rose-500': smsCharCount > 306
+                    }"
+                    :style="{ width: `${Math.min(100, (smsCharCount / 160) * 100)}%` }"
+                  ></div>
+                </div>
+
+                <div class="relative">
+                  <!-- Editor Enriquecido con Variables Atómicas e Indivisibles -->
+                  <div 
+                    ref="smsEditorRef"
+                    contenteditable="true"
+                    @input="onEditorInput"
+                    @paste="onEditorPaste"
+                    data-placeholder="Escribe el mensaje SMS para los pasajeros..."
+                    class="w-full min-h-[140px] max-h-72 overflow-y-auto rounded-xl p-3 text-xs text-slate-900 dark:text-white font-mono leading-relaxed transition-all focus:outline-none whitespace-pre-wrap break-words cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:pointer-events-none"
+                    :class="{
+                      'bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500': smsSegmentCount === 1,
+                      'bg-amber-50/20 dark:bg-amber-950/20 border-2 border-amber-500 dark:border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.2)]': smsSegmentCount === 2,
+                      'bg-rose-50/20 dark:bg-rose-950/20 border-2 border-rose-500 dark:border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.3)]': smsSegmentCount >= 3
+                    }"
+                  ></div>
+                </div>
+
+                <!-- BANNER DE ALERTA DE ALTO IMPACTO (Visible si excede 1 SMS) -->
+                <div 
+                  v-if="smsSegmentCount > 1" 
+                  class="p-4 rounded-xl border-2 transition-all space-y-3 shadow-xs"
+                  :class="smsSegmentCount === 2 
+                    ? 'bg-amber-500/10 border-amber-500 text-amber-950 dark:text-amber-100' 
+                    : 'bg-rose-500/10 border-rose-500 text-rose-950 dark:text-rose-100'"
+                >
+                  <div class="flex items-start gap-3">
+                    <div 
+                      class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-black text-white text-base shadow-sm"
+                      :class="smsSegmentCount === 2 ? 'bg-amber-500' : 'bg-rose-500 animate-pulse'"
+                    >
+                      !
+                    </div>
+                    <div class="space-y-1 flex-1">
+                      <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 class="font-black text-xs uppercase tracking-wide flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+                          <span>¡ALERTA: HAS EXCEDIDO LOS 160 CARACTERES!</span>
+                        </h4>
+                      </div>
+                      <p class="text-xs leading-relaxed">
+                        Escribiste <strong>{{ smsCharCount }} caracteres</strong> (excediste el límite por <strong>{{ smsCharCount - 160 }} caracteres</strong>).
+                        Según esta cantidad de caracteres, las empresas telefónicas te cobrarán 
+                        <strong class="underline decoration-2 font-bold">{{ smsSegmentCount }} MENSAJES SMS</strong> por cada pasajero.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Escala de cobro según cantidad de caracteres -->
+                  <div class="p-3 rounded-xl bg-white/90 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                    <div class="font-bold text-[10px] uppercase tracking-wider text-slate-500">
+                      Escala de cobro telefónico según caracteres:
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-[11px]">
+                      <div class="p-2 rounded-lg border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                        <div class="text-slate-400 font-mono text-[10px]">1 a 160 caracs.</div>
+                        <div class="font-bold text-slate-700 dark:text-slate-300">Cuesta 1 SMS</div>
+                      </div>
+                      <div 
+                        class="p-2 rounded-lg border transition-all"
+                        :class="smsSegmentCount === 2 
+                          ? 'border-amber-500 bg-amber-500/15 font-black text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/30' 
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500'"
+                      >
+                        <div class="font-mono text-[10px]">161 a 306 caracs.</div>
+                        <div class="font-bold">Cuesta 2 SMS {{ smsSegmentCount === 2 ? '👈 (Tu caso)' : '' }}</div>
+                      </div>
+                      <div 
+                        class="p-2 rounded-lg border transition-all"
+                        :class="smsSegmentCount >= 3 
+                          ? 'border-rose-500 bg-rose-500/15 font-black text-rose-700 dark:text-rose-300 ring-2 ring-rose-500/30' 
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500'"
+                      >
+                        <div class="font-mono text-[10px]">307+ caracs.</div>
+                        <div class="font-bold">Cuesta 3+ SMS {{ smsSegmentCount >= 3 ? '👈 (Tu caso)' : '' }}</div>
+                      </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] font-mono flex-wrap gap-2">
+                      <span>Costo por pasajero: <strong>{{ smsSegmentCount }} SMS</strong></span>
+                      <span v-if="broadcastPreviewData?.total_recipients > 0" class="text-rose-600 dark:text-rose-400 font-bold">
+                        Total de saldo a gastar: {{ broadcastPreviewData.total_recipients * smsSegmentCount }} SMS (en lugar de {{ broadcastPreviewData.total_recipients }})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
               <!-- Alertas de Normativas ATT / Entel en Vivo -->
@@ -2447,14 +2617,18 @@
 
               <!-- Botones para Insertar Etiquetas Dinámicas -->
               <div>
-                <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">Insertar variables:</span>
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="block text-[11px] font-semibold text-slate-500">Insertar variables:</span>
+                  <span class="text-[10px] text-slate-400">Clic para insertar en el cursor</span>
+                </div>
                 <div class="flex flex-wrap gap-1.5">
                   <button 
-                    v-for="tag in ['{apellido}', '{vuelo}', '{origen}', '{destino}', '{fecha}', '{hora}', '{pnr}']"
+                    v-for="tag in availableSmsTags"
                     :key="tag"
                     type="button"
                     @click="insertSmsTag(tag)"
-                    class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 text-[11px] font-mono transition cursor-pointer"
+                    class="px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 active:scale-95 shadow-2xs"
+                    :title="'Insertar ' + tag + ' en la posición del cursor'"
                   >
                     +{{ tag }}
                   </button>
@@ -2583,15 +2757,15 @@
                           SMS GoIP
                         </span>
 
-                        <!-- Badge Puerto GoIP -->
-                        <span v-if="c.filters?.goip_line === '1'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                          Puerto 1
+                        <!-- Badge Línea SIM / Puerto GoIP -->
+                        <span v-if="c.filters?.goip_line === '1'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20" :title="'Línea 1: ' + lineAliases.line1">
+                          {{ lineAliases.line1 }}
                         </span>
-                        <span v-else-if="c.filters?.goip_line === '2'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                          Puerto 2
+                        <span v-else-if="c.filters?.goip_line === '2'" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20" :title="'Línea 2: ' + lineAliases.line2">
+                          {{ lineAliases.line2 }}
                         </span>
-                        <span v-else class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
-                          Puertos 1 y 2
+                        <span v-else class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20" title="Intercalado entre ambas líneas">
+                          Ambas Líneas (50/50)
                         </span>
                       </div>
                       <div class="text-[11px] text-slate-500 truncate max-w-xs mt-0.5">{{ c.message }}</div>
@@ -3305,7 +3479,7 @@
         class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm overflow-y-auto"
         @click.self="broadcastDetailModal.isOpen = false"
       >
-        <div class="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div class="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto animate-slide-up">
           <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
             <div>
               <h3 class="text-sm font-bold text-slate-900 dark:text-white">
@@ -3324,10 +3498,29 @@
             </button>
           </div>
 
-          <!-- Mensaje enviado en la campaña -->
-          <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs font-mono">
-            <span class="text-[10px] text-slate-400 uppercase font-sans font-bold block mb-1">Plantilla Transmitida:</span>
-            <div class="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{{ broadcastDetailModal.campaign?.message }}</div>
+          <!-- Mensaje Real Recibido por los Pasajeros (Ejemplo) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-[10px] text-slate-500 uppercase font-sans font-bold tracking-wider">
+                Mensaje Recibido por los Pasajeros (Ejemplo):
+              </span>
+              <span v-if="broadcastDetailModal.recipients?.[0]?.passenger_name" class="text-[11px] text-slate-400 font-sans">
+                Para: <span class="font-semibold text-slate-700 dark:text-slate-300">{{ broadcastDetailModal.recipients[0].passenger_name }}</span>
+              </span>
+            </div>
+            <div class="text-xs text-slate-800 dark:text-slate-200 font-sans leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200/70 dark:border-slate-800 shadow-sm">
+              {{ broadcastDetailModal.recipients?.[0]?.message || broadcastDetailModal.campaign?.message }}
+            </div>
+
+            <!-- Plantilla técnica colapsable (opcional) -->
+            <details v-if="broadcastDetailModal.campaign?.message" class="pt-1">
+              <summary class="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer select-none">
+                Ver plantilla técnica con variables
+              </summary>
+              <div class="mt-1.5 p-2 rounded-lg bg-slate-100 dark:bg-slate-900/80 font-mono text-[11px] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 whitespace-pre-wrap">
+                {{ broadcastDetailModal.campaign?.message }}
+              </div>
+            </details>
           </div>
 
           <!-- Lista de Destinatarios de la Campaña -->
@@ -3340,20 +3533,57 @@
               <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-semibold uppercase text-[11px]">
                 <tr>
                   <th class="p-2.5">Pasajero</th>
+                  <th class="p-2.5">PNR / Reserva</th>
                   <th class="p-2.5">Teléfono</th>
                   <th class="p-2.5">Vuelo</th>
+                  <th class="p-2.5">Línea SIM</th>
                   <th class="p-2.5">Estado</th>
-                  <th class="p-2.5">ID GoIP / Info</th>
+                  <th class="p-2.5">Mensaje Enviado</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300 font-mono">
-                <tr v-for="r in broadcastDetailModal.recipients" :key="r.id">
-                  <td class="p-2.5 font-sans font-semibold text-slate-900 dark:text-white">
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                <tr v-for="r in broadcastDetailModal.recipients" :key="r.id" class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                  <td class="p-2.5 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
                     {{ r.passenger_name || 'Pasajero' }}
                   </td>
-                  <td class="p-2.5">{{ r.phone }}</td>
-                  <td class="p-2.5">{{ r.flight_number || 'N/A' }}</td>
-                  <td class="p-2.5">
+                  <td class="p-2.5 whitespace-nowrap">
+                    <span 
+                      v-if="r.booking_reference || r.lead?.booking_reference"
+                      class="px-2 py-0.5 rounded font-mono font-bold text-xs bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 inline-block"
+                      title="Código de Reserva / PNR"
+                    >
+                      {{ r.booking_reference || r.lead?.booking_reference }}
+                    </span>
+                    <span 
+                      v-else 
+                      class="text-slate-400 font-mono text-[11px] italic"
+                      title="Ingreso manual sin código de reserva"
+                    >
+                      - (Manual)
+                    </span>
+                  </td>
+                  <td class="p-2.5 font-mono whitespace-nowrap">{{ r.phone }}</td>
+                  <td class="p-2.5 font-mono whitespace-nowrap">{{ r.flight_number || '-' }}</td>
+                  <td class="p-2.5 whitespace-nowrap text-[11px]">
+                    <span 
+                      v-if="r.channel_used === 'sms_l1' || (r.gateway_message_id && r.gateway_message_id.startsWith('L1:'))" 
+                      class="px-1.5 py-0.5 rounded text-[10px] font-bold font-sans bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 inline-flex items-center gap-1"
+                      :title="'Enviado a través de ' + lineAliases.line1 + ' (Puerto 1)'"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                      {{ lineAliases.line1 }}
+                    </span>
+                    <span 
+                      v-else-if="r.channel_used === 'sms_l2' || (r.gateway_message_id && r.gateway_message_id.startsWith('L2:'))" 
+                      class="px-1.5 py-0.5 rounded text-[10px] font-bold font-sans bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center gap-1"
+                      :title="'Enviado a través de ' + lineAliases.line2 + ' (Puerto 2)'"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                      {{ lineAliases.line2 }}
+                    </span>
+                    <span v-else class="text-slate-400">-</span>
+                  </td>
+                  <td class="p-2.5 whitespace-nowrap">
                     <span 
                       class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-sans"
                       :class="[
@@ -3364,32 +3594,16 @@
                     >
                       {{ r.status === 'sent' ? 'Entregado' : (r.status === 'failed' ? 'Fallido' : 'En cola GoIP') }}
                     </span>
+                    <div v-if="r.error_message" class="text-red-500 text-[10px] mt-0.5 max-w-[150px] truncate" :title="r.error_message">
+                      {{ r.error_message }}
+                    </div>
                   </td>
-                  <td class="p-2.5 text-[11px]">
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                      <span 
-                        v-if="r.channel_used === 'sms_l1' || (r.gateway_message_id && r.gateway_message_id.startsWith('L1:'))" 
-                        class="px-1.5 py-0.5 rounded text-[10px] font-bold font-sans bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 inline-flex items-center gap-1"
-                        title="Enviado a través de la Línea/Puerto 1 de GoIP"
-                      >
-                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                        Puerto 1
-                      </span>
-                      <span 
-                        v-else-if="r.channel_used === 'sms_l2' || (r.gateway_message_id && r.gateway_message_id.startsWith('L2:'))" 
-                        class="px-1.5 py-0.5 rounded text-[10px] font-bold font-sans bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center gap-1"
-                        title="Enviado a través de la Línea/Puerto 2 de GoIP"
-                      >
-                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                        Puerto 2
-                      </span>
-                      <span v-if="r.gateway_message_id" class="text-emerald-600 dark:text-emerald-400 font-bold">
-                        ID:{{ r.gateway_message_id }}
-                      </span>
-                      <span v-else-if="r.error_message" class="text-red-500" :title="r.error_message">
-                        {{ r.error_message.substring(0, 30) }}...
-                      </span>
-                      <span v-else class="text-slate-400">-</span>
+                  <td class="p-2.5 min-w-[260px] max-w-[380px]">
+                    <div 
+                      class="text-[11px] leading-relaxed text-slate-700 dark:text-slate-300 font-sans line-clamp-2 hover:line-clamp-none transition-all cursor-pointer"
+                      :title="r.message || broadcastDetailModal.campaign?.message"
+                    >
+                      {{ r.message || broadcastDetailModal.campaign?.message }}
                     </div>
                   </td>
                 </tr>
@@ -3464,6 +3678,210 @@
       </div>
     </Transition>
 
+    <!-- Modal Bautizar Líneas / Chips SIM GoIP -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div 
+        v-if="showLineNamingModal" 
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+        @click.self="showLineNamingModal = false"
+      >
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <!-- Cabecera -->
+          <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                <Smartphone class="w-4 h-4" />
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white">Bautizar Líneas Telefónicas (SIM)</h3>
+                <p class="text-[11px] text-slate-500">Asigna nombres y números reales para evitar confusiones con "puertos"</p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              @click="showLineNamingModal = false" 
+              class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Cuerpo -->
+          <form @submit.prevent="saveLineAliases" class="p-5 space-y-4">
+            <div class="space-y-1.5">
+              <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                <span>Nombre / Teléfono de la Línea 1 (Puerto 1):</span>
+              </label>
+              <input 
+                v-model="lineAliasInputs.line1" 
+                type="text" 
+                required
+                placeholder="Ej. Entel 74844348 (Principal)" 
+                class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+              />
+              <p class="text-[10px] text-slate-400">Ejemplo: "Entel 74844348" o "Línea Principal".</p>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span>Nombre / Teléfono de la Línea 2 (Puerto 2):</span>
+              </label>
+              <input 
+                v-model="lineAliasInputs.line2" 
+                type="text" 
+                required
+                placeholder="Ej. Entel 78912345 (Secundario)" 
+                class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              />
+              <p class="text-[10px] text-slate-400">Este nombre se reflejará en el selector, la lista de pasajeros y el historial.</p>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <button 
+                type="button" 
+                @click="resetLineAliases" 
+                class="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline cursor-pointer"
+              >
+                Restablecer por defecto
+              </button>
+
+              <div class="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  @click="showLineNamingModal = false" 
+                  class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  class="px-4 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                >
+                  Guardar Nombres
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Modal de Alerta: Exceso de Caracteres SMS y Costo por Mensajes -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div 
+        v-if="showExceededSmsConfirmModal" 
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs"
+        @click.self="showExceededSmsConfirmModal = false"
+      >
+        <div class="bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <!-- Cabecera de Alerta -->
+          <div class="p-4 border-b border-amber-200 dark:border-amber-900/50 bg-amber-500/15 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-xl shadow-sm shrink-0">
+                <AlertTriangle class="w-6 h-6" />
+              </div>
+              <div>
+                <h3 class="text-sm font-black text-amber-950 dark:text-amber-200 uppercase tracking-wide">
+                  ¡Alerta! Has excedido los 160 caracteres
+                </h3>
+                <p class="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                  Se cobrarán más mensajes según la cantidad de caracteres redactados
+                </p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              @click="showExceededSmsConfirmModal = false" 
+              class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Cuerpo Informativo y Detalle de Costo -->
+          <div class="p-5 space-y-4">
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-500 font-semibold">Longitud de tu mensaje:</span>
+                <span class="font-mono font-bold text-amber-600 dark:text-amber-400">
+                  {{ smsCharCount }} caracteres (excediste por {{ smsCharCount - 160 }})
+                </span>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-500 font-semibold">Límite para 1 solo mensaje:</span>
+                <span class="font-mono text-slate-700 dark:text-slate-300">160 caracteres</span>
+              </div>
+              <div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-bold">
+                <span class="text-slate-700 dark:text-slate-200">Costo según cantidad de caracteres:</span>
+                <span class="px-2 py-0.5 rounded text-xs bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500 font-extrabold">
+                  {{ smsSegmentCount }} MENSAJES SMS por cada pasajero
+                </span>
+              </div>
+            </div>
+
+            <!-- Explicación de Normativa Celular -->
+            <div class="space-y-1.5 text-xs">
+              <div class="font-bold text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider">
+                ¿Por qué te costará {{ smsSegmentCount }} mensajes?
+              </div>
+              <div class="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                Por normas de telefonía celular GSM, cuando un mensaje supera los 160 caracteres, las operadoras lo fragmentan en partes de 153 caracteres y te cobran <strong>{{ smsSegmentCount }} SMS independientes por cada pasajero</strong>.
+              </div>
+            </div>
+
+            <!-- Resumen Total de Saldo a Descontar -->
+            <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 space-y-1.5 text-xs text-rose-950 dark:text-rose-200">
+              <div class="font-extrabold flex items-center justify-between">
+                <span>Impacto total en el saldo del chip SIM:</span>
+                <span class="font-mono text-base font-black text-rose-600 dark:text-rose-400">
+                  {{ (broadcastPreviewData?.total_recipients || 0) * smsSegmentCount }} SMS
+                </span>
+              </div>
+              <p class="text-[11px] text-rose-800 dark:text-rose-300">
+                Se enviará a <strong>{{ broadcastPreviewData?.total_recipients || 0 }} pasajeros</strong>. En lugar de consumir {{ broadcastPreviewData?.total_recipients || 0 }} SMS de saldo, se debitarán <strong>{{ (broadcastPreviewData?.total_recipients || 0) * smsSegmentCount }} SMS</strong> (+{{ (broadcastPreviewData?.total_recipients || 0) * (smsSegmentCount - 1) }} SMS adicionales).
+              </p>
+            </div>
+
+            <!-- Opciones y Acciones -->
+            <div class="pt-2 flex flex-col gap-2">
+              <button 
+                type="button" 
+                @click="handleConfirmExceededAndSend" 
+                class="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+              >
+                <span>Acepto el sobrecosto: Enviar como {{ smsSegmentCount }} SMS por pasajero</span>
+              </button>
+
+              <button 
+                type="button" 
+                @click="showExceededSmsConfirmModal = false" 
+                class="w-full py-2 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-center text-xs font-semibold transition cursor-pointer"
+              >
+                Cancelar y volver a editar el mensaje
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Modal de Perfil de Usuario y Cambio de Contraseña -->
     <UserProfileModal 
       :is-open="showProfileModal" 
@@ -3473,7 +3891,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/useAuthStore';
 import api from '@/api/client';
@@ -3661,6 +4079,10 @@ onMounted(async () => {
       fetchMonitorConversations();
     }
   }, 6000);
+
+  nextTick(() => {
+    syncEditorContent(broadcastForm.value.message);
+  });
 });
 
 onUnmounted(() => {
@@ -3684,6 +4106,9 @@ watch(activeTab, (newTab) => {
     fetchTickets();
     fetchMetrics();
   } else if (newTab === 'broadcasts') {
+    nextTick(() => {
+      syncEditorContent(broadcastForm.value.message);
+    });
     fetchBroadcastCampaigns().then(() => {
       // Auto-iniciar motor en vivo si hay campañas en proceso o pendientes
       const hasActive = broadcastCampaigns.value.some(c => ['processing', 'pending'].includes(c.status));
@@ -4402,6 +4827,43 @@ const broadcastForm = ref({
   dispatch_immediate: true,
 });
 
+// Nombres personalizados / Bautizo de Líneas SIM (GoIP)
+const lineAliases = ref({
+  line1: localStorage.getItem('crm_goip_line1_name') || 'Línea 1 (SIM 1)',
+  line2: localStorage.getItem('crm_goip_line2_name') || 'Línea 2 (SIM 2)',
+});
+
+const lineAliasInputs = ref({
+  line1: lineAliases.value.line1,
+  line2: lineAliases.value.line2,
+});
+
+const showLineNamingModal = ref(false);
+
+function openLineNamingModal() {
+  lineAliasInputs.value.line1 = lineAliases.value.line1;
+  lineAliasInputs.value.line2 = lineAliases.value.line2;
+  showLineNamingModal.value = true;
+}
+
+function saveLineAliases() {
+  const l1 = lineAliasInputs.value.line1.trim() || 'Línea 1 (SIM 1)';
+  const l2 = lineAliasInputs.value.line2.trim() || 'Línea 2 (SIM 2)';
+  lineAliases.value.line1 = l1;
+  lineAliases.value.line2 = l2;
+  localStorage.setItem('crm_goip_line1_name', l1);
+  localStorage.setItem('crm_goip_line2_name', l2);
+  showLineNamingModal.value = false;
+  showToast('Nombres de líneas SIM guardados con éxito.', 'success');
+}
+
+function resetLineAliases() {
+  lineAliasInputs.value.line1 = 'Línea 1 (SIM 1)';
+  lineAliasInputs.value.line2 = 'Línea 2 (SIM 2)';
+}
+
+const showExceededSmsConfirmModal = ref(false);
+
 function onPortChange() {
   if (broadcastPreviewData.value) {
     fetchBroadcastPreview();
@@ -4416,6 +4878,7 @@ const showBulkManualInput = ref(false);
 const manualPassengerInput = ref({
   surname: '',
   phone: '',
+  pnr: '',
 });
 
 const parsedManualRecipients = computed(() => {
@@ -4427,10 +4890,20 @@ const parsedManualRecipients = computed(() => {
     const match = line.match(/(?:\+?591[\s\-]*)?([67]\d{7}|\d{8,12})/);
     if (match) {
       const phone = match[1].replace(/\D/g, '');
-      let namePart = line.replace(match[0], '').replace(/[\s\-,;:\/|]+/g, ' ').trim();
+      let lineWithoutPhone = line.replace(match[0], '');
+      
+      let pnr = null;
+      const pnrMatch = lineWithoutPhone.match(/\[([A-Z0-9]{5,8})\]|\(([A-Z0-9]{5,8})\)|(?:pnr[:\s]*)([A-Z0-9]{5,8})/i);
+      if (pnrMatch) {
+        pnr = (pnrMatch[1] || pnrMatch[2] || pnrMatch[3]).toUpperCase();
+        lineWithoutPhone = lineWithoutPhone.replace(pnrMatch[0], '');
+      }
+
+      let namePart = lineWithoutPhone.replace(/[\s\-,;:\/|]+/g, ' ').trim();
       result.push({
         phone,
         surname: namePart ? namePart.toUpperCase() : 'Pasajero',
+        pnr,
         raw: line,
       });
     }
@@ -4445,7 +4918,8 @@ function addManualPassengerRow() {
     return;
   }
   const surname = (manualPassengerInput.value.surname || '').trim().toUpperCase() || 'Pasajero';
-  const entry = `${phone} - ${surname}`;
+  const pnr = (manualPassengerInput.value.pnr || '').trim().toUpperCase();
+  const entry = pnr ? `${phone} - ${surname} [${pnr}]` : `${phone} - ${surname}`;
   
   const current = (broadcastForm.value.manual_phones || '').trim();
   if (current) {
@@ -4455,6 +4929,7 @@ function addManualPassengerRow() {
   }
   manualPassengerInput.value.surname = '';
   manualPassengerInput.value.phone = '';
+  manualPassengerInput.value.pnr = '';
   showToast(`Pasajero ${surname} (${phone}) agregado.`, 'success');
   
   if (broadcastPreviewData.value) {
@@ -4655,7 +5130,11 @@ async function processManifestPdfFile(file) {
     }
   } catch (e) {
     console.error('Error subiendo PDF de manifiesto:', e);
-    showToast(e.response?.data?.message || 'Error al procesar el archivo PDF del manifiesto', 'error');
+    const serverErrors = e.response?.data?.errors;
+    const errorMsg = serverErrors
+      ? Object.values(serverErrors).flat().join('. ')
+      : (e.response?.data?.message || 'Error al procesar el archivo PDF del manifiesto');
+    showToast(errorMsg, 'error');
   } finally {
     manifestLoading.value = false;
   }
@@ -4887,19 +5366,143 @@ function clearImportedManifest() {
   showToast('Manifiesto PDF removido. Se usarán los pasajeros registrados en el CRM.', 'info');
 }
 
+const smsEditorRef = ref(null);
+
+const availableSmsTags = [
+  '{apellido}',
+  '{vuelo}',
+  '{origen}',
+  '{destino}',
+  '{fecha}',
+  '{hora}',
+  '{pnr}',
+];
+
+function tagToChipHtml(tag) {
+  return `<span class="sms-variable-chip inline-block px-1.5 py-0.5 mx-0.5 rounded bg-sky-100/80 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800 font-mono text-[11px] font-semibold select-none shadow-2xs align-baseline cursor-default" contenteditable="false" data-tag="${tag}">${tag}</span>`;
+}
+
+function textToEditorHtml(text) {
+  if (!text) return '';
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  
+  html = html.replace(/\{(apellido|vuelo|origen|destino|fecha|hora|pnr)\}/g, (match) => {
+    return tagToChipHtml(match);
+  });
+  
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function editorHtmlToText(editorEl) {
+  if (!editorEl) return '';
+  let text = '';
+
+  function traverse(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.classList && node.classList.contains('sms-variable-chip')) {
+        text += node.getAttribute('data-tag') || '';
+      } else if (node.tagName === 'BR') {
+        text += '\n';
+      } else if (node.tagName === 'DIV' || node.tagName === 'P') {
+        if (text.length > 0 && !text.endsWith('\n')) {
+          text += '\n';
+        }
+        for (const child of node.childNodes) {
+          traverse(child);
+        }
+      } else {
+        for (const child of node.childNodes) {
+          traverse(child);
+        }
+      }
+    }
+  }
+
+  for (const child of editorEl.childNodes) {
+    traverse(child);
+  }
+
+  return text;
+}
+
+function syncEditorContent(text) {
+  if (smsEditorRef.value) {
+    smsEditorRef.value.innerHTML = textToEditorHtml(text || '');
+  }
+}
+
+function onEditorInput() {
+  if (!smsEditorRef.value) return;
+  const text = editorHtmlToText(smsEditorRef.value);
+  broadcastForm.value.message = text;
+}
+
+function onEditorPaste(e) {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  if (!text) return;
+  document.execCommand('insertText', false, text);
+  onEditorInput();
+}
+
+function insertSmsTag(tag) {
+  if (!smsEditorRef.value) return;
+  smsEditorRef.value.focus();
+
+  const sel = window.getSelection();
+  let range = null;
+  if (sel && sel.rangeCount > 0) {
+    range = sel.getRangeAt(0);
+    if (!smsEditorRef.value.contains(range.commonAncestorContainer)) {
+      range = null;
+    }
+  }
+
+  const chipEl = document.createElement('span');
+  chipEl.className = 'sms-variable-chip inline-block px-1.5 py-0.5 mx-0.5 rounded bg-sky-100/80 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800 font-mono text-[11px] font-semibold select-none shadow-2xs align-baseline cursor-default';
+  chipEl.setAttribute('contenteditable', 'false');
+  chipEl.setAttribute('data-tag', tag);
+  chipEl.textContent = tag;
+
+  const spaceNode = document.createTextNode(' ');
+
+  if (range) {
+    range.deleteContents();
+    range.insertNode(spaceNode);
+    range.insertNode(chipEl);
+    range.setStartAfter(spaceNode);
+    range.setEndAfter(spaceNode);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } else {
+    smsEditorRef.value.appendChild(chipEl);
+    smsEditorRef.value.appendChild(spaceNode);
+    const newRange = document.createRange();
+    newRange.setStartAfter(spaceNode);
+    newRange.setEndAfter(spaceNode);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
+  onEditorInput();
+}
+
 function selectFlightSituation(type) {
   broadcastForm.value.template_type = type;
   if (smsTemplates[type]) {
     broadcastForm.value.message = smsTemplates[type];
+    syncEditorContent(smsTemplates[type]);
   }
 }
 
 function applySmsTemplate(type) {
   selectFlightSituation(type);
-}
-
-function insertSmsTag(tag) {
-  broadcastForm.value.message = (broadcastForm.value.message || '') + tag;
 }
 
 function formatBroadcastDate(d) {
@@ -4935,10 +5538,34 @@ async function fetchBroadcastPreview() {
 
 async function submitBroadcastCampaign() {
   const count = broadcastPreviewData.value?.total_recipients || 0;
-  const channelLabel = `SMS GoIP (${broadcastForm.value.goip_line === 'both' ? 'Puertos 1 y 2 Intercalados' : 'Puerto ' + broadcastForm.value.goip_line})`;
-  if (!confirm(`¿Iniciar el envío masivo mediante ${channelLabel} a ${count} pasajero(s)?`)) {
+  if (count === 0) {
+    showToast('No hay destinatarios seleccionados para el envío.', 'warning');
     return;
   }
+
+  // ALERTA OBLIGATORIA SI EXCEDE LOS 160 CARACTERES
+  if (smsSegmentCount.value > 1) {
+    showExceededSmsConfirmModal.value = true;
+    return;
+  }
+
+  // Confirmación estándar si está dentro del límite de 1 SMS (<= 160 caracteres)
+  const channelLabel = broadcastForm.value.goip_line === 'both' 
+    ? `SMS GoIP (Ambas Líneas: ${lineAliases.value.line1} y ${lineAliases.value.line2})` 
+    : `SMS GoIP (${broadcastForm.value.goip_line === '1' ? lineAliases.value.line1 : lineAliases.value.line2})`;
+  if (!confirm(`¿Iniciar el envío masivo mediante ${channelLabel} a ${count} pasajero(s)? (Longitud óptima: 1 SMS por pasajero)`)) {
+    return;
+  }
+
+  await executeBroadcastCampaign();
+}
+
+function handleConfirmExceededAndSend() {
+  showExceededSmsConfirmModal.value = false;
+  executeBroadcastCampaign();
+}
+
+async function executeBroadcastCampaign() {
   broadcastSubmitting.value = true;
   try {
     const payload = {
