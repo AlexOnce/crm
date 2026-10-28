@@ -60,12 +60,60 @@ class IssabelAmiService
     }
 
     /**
-     * Prueba la conexión TCP y la autenticación del usuario contra Asterisk AMI.
+     * Prueba la conexión TCP y la autenticación del usuario contra Asterisk AMI con diagnóstico detallado.
      *
-     * @return array{success: bool, message: string, banner: ?string}
+     * @return array{
+     *     success: bool,
+     *     message: string,
+     *     error_type: ?string,
+     *     diagnostic: ?string,
+     *     banner: ?string,
+     *     host: string,
+     *     port: int
+     * }
      */
     public function testConnection(): array
     {
+        // 1. Verificación preliminar de funciones PHP requeridas en hostings
+        if (! function_exists('stream_socket_client')) {
+            return [
+                'success' => false,
+                'message' => 'Función stream_socket_client() no disponible',
+                'error_type' => 'PHP_FUNCTION_DISABLED',
+                'diagnostic' => 'La función PHP stream_socket_client() está deshabilitada en el archivo php.ini de tu hosting (directiva disable_functions). Contacta al soporte de tu hosting para habilitarla.',
+                'banner' => null,
+                'host' => $this->host,
+                'port' => $this->port,
+            ];
+        }
+
+        // 2. Verificación de credenciales básicas en .env
+        if (empty($this->host) || $this->host === '192.168.1.50' || $this->host === 'localhost' || $this->host === '127.0.0.1') {
+            if (empty($this->host)) {
+                return [
+                    'success' => false,
+                    'message' => 'ISSABEL_HOST no configurado',
+                    'error_type' => 'MISSING_HOST',
+                    'diagnostic' => 'La variable ISSABEL_HOST está vacía en el archivo .env de tu hosting. Debes colocar la IP pública de Issabel (ej. 186.121.251.146).',
+                    'banner' => null,
+                    'host' => $this->host,
+                    'port' => $this->port,
+                ];
+            }
+        }
+
+        if (empty($this->secret)) {
+            return [
+                'success' => false,
+                'message' => 'ISSABEL_AMI_SECRET no configurado',
+                'error_type' => 'MISSING_SECRET',
+                'diagnostic' => 'La variable ISSABEL_AMI_SECRET está vacía en el archivo .env de tu hosting. Configura la contraseña de conexión AMI (ej. issabel2026*).',
+                'banner' => null,
+                'host' => $this->host,
+                'port' => $this->port,
+            ];
+        }
+
         $socket = null;
         try {
             $socket = $this->openSocket();
@@ -73,10 +121,16 @@ class IssabelAmiService
 
             $loginResponse = $this->login($socket);
             if (! ($loginResponse['success'] ?? false)) {
+                $errMsg = $loginResponse['message'] ?? 'Credenciales rechazadas por Asterisk';
+
                 return [
                     'success' => false,
-                    'message' => 'Fallo de autenticación: '.($loginResponse['message'] ?? 'Credenciales rechazadas por Asterisk'),
+                    'message' => 'Fallo de autenticación: '.$errMsg,
+                    'error_type' => 'AUTH_FAILED',
+                    'diagnostic' => "Asterisk rechazó la autenticación del usuario AMI '{$this->username}'. Verifica: 1) Que el usuario y secreto coincidan con /etc/asterisk/manager_custom.conf. 2) Que en manager_custom.conf la directiva permit= permita la IP pública de tu hosting o tenga permit=0.0.0.0/0.0.0.0.",
                     'banner' => $banner,
+                    'host' => $this->host,
+                    'port' => $this->port,
                 ];
             }
 
@@ -85,19 +139,45 @@ class IssabelAmiService
             return [
                 'success' => true,
                 'message' => 'Conexión y autenticación exitosas con Issabel AMI.',
+                'error_type' => null,
+                'diagnostic' => 'Conexión TCP y autenticación Asterisk AMI funcionando al 100%.',
                 'banner' => $banner,
+                'host' => $this->host,
+                'port' => $this->port,
             ];
         } catch (Exception $e) {
+            $msg = $e->getMessage();
+            $lower = strtolower($msg);
+            $errorType = 'SOCKET_ERROR';
+            $diagnostic = "No se pudo conectar a {$this->host}:{$this->port}. Detalle: {$msg}";
+
+            if (str_contains($lower, 'timed out') || str_contains($lower, '110') || str_contains($lower, '10060')) {
+                $errorType = 'SOCKET_TIMEOUT';
+                $diagnostic = "Tiempo de espera agotado (Timeout) al conectar con {$this->host}:{$this->port}. CAUSAS MÁS PROBABLES: 1) El firewall de tu hosting bloquea las conexiones salientes en el puerto 5038 TCP (muy común en cPanel/hostings compartidos). Solicita a soporte abrir el puerto 5038 TCP saliente. 2) El firewall de Issabel (iptables) bloquea la IP pública de tu hosting.";
+            } elseif (str_contains($lower, 'refused') || str_contains($lower, '111') || str_contains($lower, '10061')) {
+                $errorType = 'CONNECTION_REFUSED';
+                $diagnostic = "Conexión rechazada (Connection Refused) por {$this->host}:{$this->port}. Asterisk no está corriendo o el puerto AMI 5038 no está escuchando en Asterisk.";
+            } elseif (str_contains($lower, 'no route') || str_contains($lower, '113') || str_contains($lower, '10065')) {
+                $errorType = 'NO_ROUTE_TO_HOST';
+                $diagnostic = "Sin ruta hacia el host {$this->host}. Verifica que la IP pública de Issabel sea correcta y accesible desde internet.";
+            }
+
             Log::error('IssabelAmi: Error probando conexión', [
                 'host' => $this->host,
                 'port' => $this->port,
-                'error' => $e->getMessage(),
+                'error_type' => $errorType,
+                'error' => $msg,
+                'diagnostic' => $diagnostic,
             ]);
 
             return [
                 'success' => false,
-                'message' => 'Error al conectar con Issabel: '.$e->getMessage(),
+                'message' => 'Error al conectar con Issabel: '.$msg,
+                'error_type' => $errorType,
+                'diagnostic' => $diagnostic,
                 'banner' => null,
+                'host' => $this->host,
+                'port' => $this->port,
             ];
         } finally {
             if (is_resource($socket)) {

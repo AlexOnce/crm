@@ -10,18 +10,21 @@
           <div>
             <div class="flex items-center space-x-3">
               <h2 class="text-xl font-bold text-slate-800 dark:text-white">Avisos Call Center (Issabel PBX)</h2>
-              <span
+              <button
+                type="button"
+                @click="showConnectionDetails"
                 :class="serverStatus.connected 
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' 
-                  : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border-rose-200 dark:border-rose-800'"
-                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+                  : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-900/40 cursor-pointer'"
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all"
+                :title="serverStatus.connected ? 'AMI Conectado - Click para ver detalles' : 'Click para ver diagnóstico del error'"
               >
                 <span 
                   :class="serverStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'" 
                   class="w-2 h-2 rounded-full mr-1.5"
                 ></span>
-                {{ serverStatus.connected ? 'AMI Conectado' : 'Desconectado' }}
-              </span>
+                {{ serverStatus.connected ? 'AMI Conectado' : 'Desconectado (Ver error)' }}
+              </button>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Servidor: <span class="font-mono font-medium">{{ serverStatus.host }}:{{ serverStatus.port }}</span> • 
@@ -34,10 +37,10 @@
         <!-- Botones de Acción Rápida -->
         <div class="flex items-center space-x-2 shrink-0">
           <button
-            @click="fetchServerStatus"
+            @click="fetchServerStatus(true)"
             :disabled="loadingStatus"
             class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors disabled:opacity-50"
-            title="Verificar conexión con Asterisk"
+            title="Verificar conexión con Asterisk y mostrar diagnóstico"
           >
             <RefreshCw :class="{ 'animate-spin': loadingStatus }" class="w-3.5 h-3.5" />
             <span>Verificar Conexión</span>
@@ -583,6 +586,9 @@ const serverStatus = ref({
   source_extension: '1',
   sip_driver: 'sip',
   banner: '',
+  message: '',
+  error_type: null,
+  diagnostic: null,
 });
 const loadingStatus = ref(false);
 
@@ -680,8 +686,8 @@ function applyTemplate(tpl) {
   form.value.message = tpl.message;
 }
 
-// Carga de Datos
-async function fetchServerStatus() {
+// Carga de Datos y Diagnóstico de Conexión
+async function fetchServerStatus(manual = false) {
   loadingStatus.value = true;
   try {
     const res = await api.get('/admin/callcenter/status');
@@ -693,13 +699,93 @@ async function fetchServerStatus() {
         source_extension: res.data.source_extension || '1',
         sip_driver: res.data.sip_driver || 'sip',
         banner: res.data.banner || '',
+        message: res.data.message || '',
+        error_type: res.data.error_type || null,
+        diagnostic: res.data.diagnostic || null,
       };
       form.value.source_extension = res.data.source_extension || '1';
+
+      // Impresión de Diagnóstico detallado en Consola del Navegador
+      console.groupCollapsed(
+        `%c[CALL CENTER PBX] ${res.data.connected ? '🟢 CONECTADO' : '🔴 ERROR DE CONEXIÓN'} (${res.data.host}:${res.data.port})`,
+        res.data.connected 
+          ? 'background:#059669;color:#fff;font-weight:bold;padding:3px 8px;border-radius:4px;' 
+          : 'background:#dc2626;color:#fff;font-weight:bold;padding:3px 8px;border-radius:4px;'
+      );
+      console.log('📡 Servidor Host:', res.data.host);
+      console.log('🔌 Puerto AMI:', res.data.port);
+      console.log('🎙️ Driver SIP:', res.data.sip_driver);
+      console.log('💬 Mensaje:', res.data.message);
+      if (res.data.banner) {
+        console.log('🏷️ Banner Asterisk:', res.data.banner);
+      }
+      if (!res.data.connected) {
+        console.warn('⚠️ Tipo de Error:', res.data.error_type || 'DESCONOCIDO');
+        console.error('🚨 DIAGNÓSTICO Y SOLUCIÓN:', res.data.diagnostic || res.data.message);
+        console.info('💡 RECOMENDACIÓN: Revisa las variables en el archivo .env de tu hosting y asegúrate de que el puerto 5038 TCP saliente no esté bloqueado por el firewall.');
+      }
+      console.groupEnd();
+
+      if (manual) {
+        showConnectionDetails();
+      }
     }
   } catch (err) {
     serverStatus.value.connected = false;
+    serverStatus.value.message = err.response?.data?.message || err.message;
+    console.error('%c[CALL CENTER PBX] Fallo en la petición HTTP del endpoint /status:', 'background:#b91c1c;color:#fff;padding:2px 6px;border-radius:4px;', err);
+    if (manual) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Red / Endpoint',
+        text: 'No se pudo consultar el estado del servidor Call Center: ' + (err.response?.data?.message || err.message),
+        confirmButtonColor: '#7c3aed',
+      });
+    }
   } finally {
     loadingStatus.value = false;
+  }
+}
+
+function showConnectionDetails() {
+  if (serverStatus.value.connected) {
+    Swal.fire({
+      icon: 'success',
+      title: '¡Conexión Exitosa!',
+      html: `
+        <div class="text-left space-y-2 text-sm text-slate-700 dark:text-slate-300">
+          <p>Conectado satisfactoriamente con el servidor Issabel PBX.</p>
+          <div class="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl font-mono text-xs space-y-1">
+            <p><b>Host:</b> ${serverStatus.value.host}:${serverStatus.value.port}</p>
+            <p><b>Driver:</b> ${serverStatus.value.sip_driver}</p>
+            <p><b>Banner:</b> <span class="text-emerald-600">${serverStatus.value.banner || 'Asterisk Call Manager'}</span></p>
+          </div>
+        </div>
+      `,
+      confirmButtonColor: '#7c3aed',
+    });
+  } else {
+    Swal.fire({
+      icon: 'error',
+      title: 'Fallo de Conexión con Issabel PBX',
+      html: `
+        <div class="text-left space-y-3 text-sm text-slate-700 dark:text-slate-300">
+          <div class="bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300">
+            <p class="font-bold text-xs uppercase text-rose-600 dark:text-rose-400">Error: ${serverStatus.value.error_type || 'Fallo de Conexión'}</p>
+            <p class="mt-1 font-mono text-xs">${serverStatus.value.message || 'No se pudo conectar a Asterisk AMI.'}</p>
+          </div>
+          <div class="bg-amber-50 dark:bg-amber-950/40 p-3.5 rounded-xl border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs leading-relaxed">
+            <p class="font-bold mb-1">💡 Diagnóstico y solución:</p>
+            <p>${serverStatus.value.diagnostic || 'Revisa la consola del navegador (tecla F12) para ver los registros técnicos completos.'}</p>
+          </div>
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl font-mono text-xs text-slate-500">
+            Host configurado: <b>${serverStatus.value.host}:${serverStatus.value.port}</b>
+          </div>
+        </div>
+      `,
+      confirmButtonText: 'Entendido',
+      confirmButtonColor: '#7c3aed',
+    });
   }
 }
 
@@ -709,13 +795,14 @@ async function fetchExtensions() {
     const res = await api.get('/admin/callcenter/extensions');
     if (res.data?.success) {
       extensions.value = res.data.extensions || [];
+      console.log(`%c[CALL CENTER EXTENSIONES] ${extensions.value.length} extensiones cargadas (${onlineExtensionsCount.value} online)`, 'color:#059669;font-weight:bold;');
       // Si no hay extensiones seleccionadas y hay online, preseleccionar online
       if (selectedExtensions.value.length === 0) {
         selectOnlineExtensions();
       }
     }
   } catch (err) {
-    console.error('Error fetching extensions:', err);
+    console.error('%c[CALL CENTER EXTENSIONES] Error al consultar extensiones SIP desde Issabel:', 'background:#dc2626;color:#fff;padding:2px 6px;border-radius:4px;', err.response?.data?.message || err.message);
   } finally {
     loadingExtensions.value = false;
   }

@@ -26,6 +26,8 @@ class CallCenterBroadcastController extends Controller
             'connected' => $test['success'],
             'banner' => $test['banner'] ?? null,
             'message' => $test['message'],
+            'error_type' => $test['error_type'] ?? null,
+            'diagnostic' => $test['diagnostic'] ?? null,
             'host' => config('services.issabel.host'),
             'port' => config('services.issabel.port'),
             'source_extension' => config('services.issabel.source_extension'),
