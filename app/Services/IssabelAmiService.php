@@ -156,7 +156,12 @@ class IssabelAmiService
                 $diagnostic = "Tiempo de espera agotado (Timeout) al conectar con {$this->host}:{$this->port}. CAUSAS MÁS PROBABLES: 1) El firewall de tu hosting bloquea las conexiones salientes en el puerto 5038 TCP (muy común en cPanel/hostings compartidos). Solicita a soporte abrir el puerto 5038 TCP saliente. 2) El firewall de Issabel (iptables) bloquea la IP pública de tu hosting.";
             } elseif (str_contains($lower, 'refused') || str_contains($lower, '111') || str_contains($lower, '10061')) {
                 $errorType = 'CONNECTION_REFUSED';
-                $diagnostic = "Conexión rechazada (Connection Refused) por {$this->host}:{$this->port}. Asterisk no está corriendo o el puerto AMI 5038 no está escuchando en Asterisk.";
+                $diagnostic = "Conexión rechazada (Connection Refused [111]) por {$this->host}:{$this->port}.\n"
+                    ."CAUSAS PRINCIPALES AL SUBIR A CPANEL/HOSTING:\n"
+                    ."1) Firewall de salida en cPanel (CSF / ConfigServer Firewall): La mayoría de hostings cPanel bloquean el puerto saliente 5038 TCP por seguridad. Solicita a tu hosting habilitar el puerto 5038 TCP saliente (TCP_OUT en csf.conf) hacia la IP {$this->host}.\n"
+                    ."2) Firewall de Issabel PBX (iptables / fail2ban): Issabel rechaza las peticiones de IPs externas no autorizadas. Debes agregar la IP pública de tu servidor cPanel a la lista blanca de Issabel (iptables -I INPUT -p tcp -s IP_CPANEL --dport 5038 -j ACCEPT).\n"
+                    ."3) Router / NAT frente a Issabel: Si 186.121.251.146 está tras un router/firewall (Mikrotik/Fortinet), verifica que el reenvío (Port Forwarding) del puerto 5038 permita el tráfico desde la IP de tu cPanel.\n"
+                    ."4) Asterisk Manager (/etc/asterisk/manager_custom.conf): Verifica que el usuario tenga 'permit=IP_CPANEL/255.255.255.255' o 'permit=0.0.0.0/0.0.0.0'.";
             } elseif (str_contains($lower, 'no route') || str_contains($lower, '113') || str_contains($lower, '10065')) {
                 $errorType = 'NO_ROUTE_TO_HOST';
                 $diagnostic = "Sin ruta hacia el host {$this->host}. Verifica que la IP pública de Issabel sea correcta y accesible desde internet.";
