@@ -722,7 +722,11 @@ async function fetchServerStatus(manual = false) {
       if (!res.data.connected) {
         console.warn('⚠️ Tipo de Error:', res.data.error_type || 'DESCONOCIDO');
         console.error('🚨 DIAGNÓSTICO Y SOLUCIÓN:', res.data.diagnostic || res.data.message);
-        console.info('💡 RECOMENDACIÓN: Revisa las variables en el archivo .env de tu hosting y asegúrate de que el puerto 5038 TCP saliente no esté bloqueado por el firewall.');
+        if (Number(res.data.port) === 443) {
+          console.info('💡 RECOMENDACIÓN PUERTO 443: Sube el archivo public/issabel/ami_bridge.php a /var/www/html/ami_bridge.php en tu servidor Issabel (186.121.251.146).');
+        } else {
+          console.info('💡 RECOMENDACIÓN: Si tu hosting bloquea el puerto 5038, usa ISSABEL_AMI_PORT=443 y sube public/issabel/ami_bridge.php a /var/www/html/ami_bridge.php en Issabel.');
+        }
       }
       console.groupEnd();
 
