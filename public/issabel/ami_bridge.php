@@ -270,7 +270,7 @@ try {
             'success' => false,
             'error_type' => 'AUTH_FAILED',
             'message' => 'Fallo de autenticación: '.$login['message'],
-            'diagnostic' => "Asterisk local (127.0.0.1:{$amiPort}) rechazó las credenciales del usuario '{$username}'. Verifica en /etc/asterisk/manager_custom.conf que el usuario '{$username}', su secret y permit=127.0.0.1/255.255.255.0 estén configurados.",
+            'diagnostic' => "Asterisk local (127.0.0.1:{$amiPort}) rechazó las credenciales del usuario '{$username}'. Verifica en /etc/asterisk/manager_custom.conf que el usuario '{$username}', su secret y permit=127.0.0.1/255.255.255.0 (además de permit=216.246.47.120/255.255.255.255) estén configurados.",
             'banner' => $banner,
         ]);
         exit;

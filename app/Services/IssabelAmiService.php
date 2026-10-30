@@ -267,7 +267,7 @@ class IssabelAmiService
                     'success' => false,
                     'message' => 'Fallo de autenticación: '.$errMsg,
                     'error_type' => 'AUTH_FAILED',
-                    'diagnostic' => "Asterisk rechazó la autenticación del usuario AMI '{$this->username}'. Verifica: 1) Que el usuario y secreto coincidan con /etc/asterisk/manager_custom.conf. 2) Que en manager_custom.conf la directiva permit= permita la IP pública de tu hosting o tenga permit=0.0.0.0/0.0.0.0.",
+                    'diagnostic' => "Asterisk rechazó la autenticación del usuario AMI '{$this->username}'. Verifica: 1) Que el usuario y secreto coincidan con /etc/asterisk/manager_custom.conf. 2) Que en manager_custom.conf tengas permit=127.0.0.1/255.255.255.0 y permit=216.246.47.120/255.255.255.255 (IP de tu hosting).",
                     'banner' => $banner,
                     'host' => $this->host,
                     'port' => $this->port,
