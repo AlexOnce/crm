@@ -17,7 +17,15 @@ class ChatMessage extends Model
         'message',
         'media_url',
         'media_type',
+        'buttons',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'buttons' => 'array',
+        ];
+    }
 
     public function conversation(): BelongsTo
     {

@@ -37,7 +37,8 @@ class CrmChatController extends Controller
             $trimmed = trim($search);
             $query->where(function ($q) use ($search, $trimmed) {
                 $q->where('phone', 'like', "%{$search}%")
-                    ->orWhere('contact_name', 'like', "%{$search}%");
+                    ->orWhere('contact_name', 'like', "%{$search}%")
+                    ->orWhere('session_data->contact_phone', 'like', "%{$search}%");
 
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimmed)) {
                     $q->orWhereDate('last_interaction_at', $trimmed)
@@ -220,19 +221,22 @@ class CrmChatController extends Controller
         // Emitir mensaje en vivo vía WebSockets
         BroadcastHelper::safeBroadcast(new ChatMessageSent($message, $conversation->id, $conversation));
 
-        // 3. Enviar a través de Meta WhatsApp Cloud API al número del cliente
-        if (! empty($conversation->session_data['phone_number_id'])) {
-            $whatsapp->setPhoneNumberId($conversation->session_data['phone_number_id']);
-        }
+        // 3. Enviar a través de Meta WhatsApp Cloud API si es canal WhatsApp
+        $sent = true;
+        if ($conversation->channel !== 'web') {
+            if (! empty($conversation->session_data['phone_number_id'])) {
+                $whatsapp->setPhoneNumberId($conversation->session_data['phone_number_id']);
+            }
 
-        if ($mediaType === 'image') {
-            $sent = $whatsapp->sendImage($conversation->phone, $mediaUrl, $validated['message'] ?? '', $localPath);
-        } elseif ($mediaType === 'audio') {
-            $sent = $whatsapp->sendAudio($conversation->phone, $mediaUrl, $localPath);
-        } elseif ($mediaType === 'document') {
-            $sent = $whatsapp->sendDocument($conversation->phone, $mediaUrl, basename($mediaUrl), $validated['message'] ?? '');
-        } else {
-            $sent = $whatsapp->sendMessage($conversation->phone, $messageText);
+            if ($mediaType === 'image') {
+                $sent = $whatsapp->sendImage($conversation->phone, $mediaUrl, $validated['message'] ?? '', $localPath);
+            } elseif ($mediaType === 'audio') {
+                $sent = $whatsapp->sendAudio($conversation->phone, $mediaUrl, $localPath);
+            } elseif ($mediaType === 'document') {
+                $sent = $whatsapp->sendDocument($conversation->phone, $mediaUrl, basename($mediaUrl), $validated['message'] ?? '');
+            } else {
+                $sent = $whatsapp->sendMessage($conversation->phone, $messageText);
+            }
         }
 
         return response()->json([
@@ -266,7 +270,9 @@ class CrmChatController extends Controller
         BroadcastHelper::safeBroadcast(new ChatMessageSent($farewellMsg, $conversation->id, $conversation));
         BroadcastHelper::safeBroadcast(new ConversationUpdated($conversation, 'released'));
 
-        $whatsapp->sendMessage($conversation->phone, $farewell);
+        if ($conversation->channel !== 'web') {
+            $whatsapp->sendMessage($conversation->phone, $farewell);
+        }
 
         return response()->json([
             'success' => true,

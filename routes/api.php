@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CrmChatController;
 use App\Http\Controllers\Api\FlightBookingController;
 use App\Http\Controllers\Api\MassBroadcastController;
 use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Api\WebChatController;
 use App\Http\Controllers\Webhooks\MetaWebhookController;
 use App\Services\FlightMicroservice;
 use Illuminate\Http\Request;
@@ -33,6 +34,18 @@ Route::post('/webhook/whatsapp', [MetaWebhookController::class, 'handle']);
 */
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');
+
+/*
+|--------------------------------------------------------------------------
+| Web Chat Público (Integración con Página Web TAMep)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('webchat')->group(function () {
+    Route::post('/init', [WebChatController::class, 'init'])->middleware('throttle:15,1');
+    Route::post('/message', [WebChatController::class, 'sendMessage'])->middleware('throttle:30,1');
+    Route::get('/messages', [WebChatController::class, 'getMessages'])->middleware('throttle:60,1');
+    Route::post('/contact', [WebChatController::class, 'updateContact'])->middleware('throttle:15,1');
+});
 
 /*
 |--------------------------------------------------------------------------

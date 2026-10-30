@@ -29,11 +29,14 @@
             {{ (chatStore.activeConversation.contact_name || chatStore.activeConversation.phone).substring(0, 2).toUpperCase() }}
           </div>
           <div class="min-w-0 flex flex-col justify-center">
-            <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
-              {{ chatStore.activeConversation.contact_name || 'Pasajero de WhatsApp' }}
+            <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate flex items-center gap-2">
+              <span>{{ chatStore.activeConversation.contact_name || (chatStore.activeConversation.channel === 'web' ? 'Visitante Web' : 'Pasajero de WhatsApp') }}</span>
+              <span v-if="chatStore.activeConversation.channel === 'web'" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                Web
+              </span>
             </h3>
             <div class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5 flex items-center gap-2 truncate">
-              <span>+{{ chatStore.activeConversation.phone }}</span>
+              <span>{{ chatStore.activeConversation.channel === 'web' ? (chatStore.activeConversation.session_data?.contact_phone ? ('Tel: ' + chatStore.activeConversation.session_data.contact_phone) : 'Sesión Web en Vivo') : ('+' + chatStore.activeConversation.phone) }}</span>
               <ChatReferralBadge :conversation="chatStore.activeConversation" />
             </div>
           </div>

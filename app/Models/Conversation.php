@@ -16,6 +16,10 @@ class Conversation extends Model
     protected $fillable = [
         'phone',
         'contact_name',
+        'channel',
+        'visitor_token',
+        'visitor_ip',
+        'visitor_user_agent',
         'status',
         'current_state',
         'session_data',

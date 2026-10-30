@@ -120,11 +120,14 @@
             </div>
 
             <div class="truncate">
-              <div class="font-semibold text-xs text-slate-800 dark:text-slate-100 truncate">
-                {{ conv.contact_name || formatPhone(conv.phone) }}
+              <div class="font-semibold text-xs text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
+                <span>{{ conv.contact_name || (conv.channel === 'web' ? 'Visitante Web' : formatPhone(conv.phone)) }}</span>
+                <span v-if="conv.channel === 'web'" class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  Web
+                </span>
               </div>
               <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                +{{ conv.phone }}
+                {{ conv.channel === 'web' ? (conv.session_data?.contact_phone ? ('Tel: ' + conv.session_data.contact_phone) : 'Chat Web') : ('+' + conv.phone) }}
               </div>
             </div>
           </div>
